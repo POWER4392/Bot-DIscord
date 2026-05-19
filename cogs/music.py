@@ -147,7 +147,7 @@ class Music(commands.Cog):
                         else: search = "Spotify unsupported DRM track"
                     except: search = "Spotify fallback error"
                 
-                query = f"ytsearch:{search}" if not search.startswith("http") else search
+                query = f"scsearch:{search}" if not search.startswith("http") else search
                 with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
                     
             results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
