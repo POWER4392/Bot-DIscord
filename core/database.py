@@ -24,6 +24,8 @@ if USE_PG:
                 query = "INSERT INTO timed_roles (guild_id, user_id, role_id, expires_at) VALUES (%s, %s, %s, %s) ON CONFLICT (guild_id, user_id, role_id) DO UPDATE SET expires_at = EXCLUDED.expires_at"
             elif "INSERT OR REPLACE INTO social_tracker" in query:
                 query = "INSERT INTO social_tracker (guild_id, platform, target_id, channel_id, ping_role, last_post_id) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (guild_id, platform, target_id) DO UPDATE SET channel_id=EXCLUDED.channel_id, ping_role=EXCLUDED.ping_role, last_post_id=EXCLUDED.last_post_id"
+            elif "INSERT OR IGNORE INTO blacklists" in query:
+                query = "INSERT INTO blacklists (guild_id, word) VALUES (%s, %s) ON CONFLICT (guild_id, word) DO NOTHING"
             
             pg_conn = db_pool.getconn()
             try:
@@ -102,6 +104,10 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS reaction_panels (
 cursor.execute('''CREATE TABLE IF NOT EXISTS gui_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     action TEXT, payload TEXT
+                )''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS blacklists (
+                    guild_id TEXT, word TEXT,
+                    PRIMARY KEY (guild_id, word)
                 )''')
 conn.commit()
 

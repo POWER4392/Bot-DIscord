@@ -24,14 +24,14 @@ bot = commands.Bot(command_prefix=config.get("prefix", "!"), intents=intents)
 bot.remove_command('help')
 
 async def export_server_data():
+    import core.shared as shared
     server_data = {}
     for guild in bot.guilds:
         roles = [{"id": r.id, "name": r.name} for r in guild.roles if r.name != "@everyone"]
         channels = [{"id": c.id, "name": c.name} for c in guild.text_channels]
         categories = [{"id": c.id, "name": c.name} for c in guild.categories]
         server_data[str(guild.id)] = {"name": guild.name, "roles": roles, "channels": channels, "categories": categories}
-    with open("databases/roles_list.json", "w", encoding="utf-8") as f:
-        json.dump(server_data, f, indent=4, ensure_ascii=False)
+    shared.server_data = server_data
 
 @tasks.loop(minutes=1)
 async def check_timed_roles():

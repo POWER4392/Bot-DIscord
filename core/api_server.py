@@ -26,15 +26,25 @@ def create_handle_api(bot):
                 conn.commit()
             return web.json_response({"ok": True, "msg": "Task queued"})
         
-        elif action == "RELOAD_CONFIG":
+        elif action == "GET_CONFIG":
+            return web.json_response({"ok": True, "data": config})
+            
+        elif action == "UPDATE_CONFIG":
             try:
-                with open("config.json", "r", encoding="utf-8") as f:
-                    new_config = json.load(f)
-                    config.clear()
-                    config.update(new_config)
-                return web.json_response({"ok": True, "msg": "Config reloaded"})
+                new_config = data.get("payload", {})
+                if not new_config:
+                    return web.json_response({"ok": False, "error": "Empty payload"})
+                with open("config.json", "w", encoding="utf-8") as f:
+                    json.dump(new_config, f, indent=4, ensure_ascii=False)
+                config.clear()
+                config.update(new_config)
+                return web.json_response({"ok": True, "msg": "Config updated"})
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
+                
+        elif action == "GET_SERVER_DATA":
+            import core.shared as shared
+            return web.json_response({"ok": True, "data": shared.server_data})
         
         elif action == "STATUS":
             return web.json_response({

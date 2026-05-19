@@ -166,12 +166,9 @@ class Moderation(commands.Cog):
                 return
 
         banned_words = []
-        path = f"databases/blacklists/{guild_id}.json"
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    banned_words = json.load(f)
-            except: pass
+        with db_lock:
+            cursor.execute("SELECT word FROM blacklists WHERE guild_id=?", (guild_id,))
+            banned_words = [row[0] for row in cursor.fetchall()]
             
         if banned_words and not is_mod_or_admin:
             banned_words = [w.strip().lower() for w in banned_words if w.strip()]
@@ -337,33 +334,26 @@ class Moderation(commands.Cog):
     @is_mod()
     async def block_addword(self, ctx, *, word: str):
         guild_id = str(ctx.guild.id)
-        path = f"databases/blacklists/{guild_id}.json"
-        os.makedirs("databases/blacklists", exist_ok=True)
-        words = []
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f: words = json.load(f)
-            except: pass
         word = word.strip().lower()
-        if word in words: return await ctx.send(f"⚠️ Từ `{word}` đã tồn tại trong danh sách cấm.")
-        words.append(word)
-        with open(path, "w", encoding="utf-8") as f: json.dump(words, f, ensure_ascii=False, indent=4)
+        with db_lock:
+            cursor.execute("SELECT 1 FROM blacklists WHERE guild_id=? AND word=?", (guild_id, word))
+            if cursor.fetchone():
+                return await ctx.send(f"⚠️ Từ `{word}` đã tồn tại trong danh sách cấm.")
+            cursor.execute("INSERT OR IGNORE INTO blacklists (guild_id, word) VALUES (?, ?)", (guild_id, word))
+            conn.commit()
         await ctx.send(f"✅ Đã thêm `{word}` vào danh sách từ cấm của Server.")
 
     @commands.hybrid_command(name=config.get("cmd_delword", "delword") or "delword")
     @is_mod()
     async def block_delword(self, ctx, *, word: str):
         guild_id = str(ctx.guild.id)
-        path = f"databases/blacklists/{guild_id}.json"
-        words = []
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f: words = json.load(f)
-            except: pass
         word = word.strip().lower()
-        if word not in words: return await ctx.send(f"⚠️ Từ `{word}` không nằm trong danh sách cấm.")
-        words.remove(word)
-        with open(path, "w", encoding="utf-8") as f: json.dump(words, f, ensure_ascii=False, indent=4)
+        with db_lock:
+            cursor.execute("SELECT 1 FROM blacklists WHERE guild_id=? AND word=?", (guild_id, word))
+            if not cursor.fetchone():
+                return await ctx.send(f"⚠️ Từ `{word}` không nằm trong danh sách cấm.")
+            cursor.execute("DELETE FROM blacklists WHERE guild_id=? AND word=?", (guild_id, word))
+            conn.commit()
         await ctx.send(f"🗑️ Đã xoá `{word}` khỏi danh sách từ cấm của Server.")
 
 async def setup(bot):

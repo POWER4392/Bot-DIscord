@@ -25,6 +25,7 @@ spam_tracker = {}
 music_queues = {}
 play_history = {}
 autoplay_disabled = set()
+server_data = {}
 
 API_SECRET = config.get("api_secret", "changeme123")
 YDL_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'default_search': 'ytsearch'}
