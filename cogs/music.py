@@ -67,7 +67,10 @@ class MusicControlView(discord.ui.View):
         embed = discord.Embed(title="📜 Hàng Đợi Kế Tiếp", color=0x5865F2)
         q = music_queues[guild_id]
         for i, info in enumerate(q[:10]):
-            duration = info.get('duration', 0)
+            try:
+                duration = int(float(info.get('duration') or 0))
+            except (ValueError, TypeError):
+                duration = 0
             dur_str = f"{duration//60}:{duration%60:02d}" if duration else "Trực tiếp"
             embed.add_field(name=f"`#{i+1}` {info.get('title', 'Unknown')[:50]}", value=f"⏱ {dur_str} · 👤 {info.get('uploader', '?')}", inline=False)
         
@@ -86,7 +89,10 @@ class MusicControlView(discord.ui.View):
             await interaction.response.send_message("🛑 Đã **TẮT** Tự động phát nhạc (AutoPlay). Nhạc sẽ dừng khi hết hàng đợi.", ephemeral=False)
 
 def make_music_embed(info, title="Đang Phát"):
-    duration = info.get('duration', 0)
+    try:
+        duration = int(float(info.get('duration') or 0))
+    except (ValueError, TypeError):
+        duration = 0
     minutes, seconds = divmod(duration, 60)
     embed = discord.Embed(title=f"🎶 {title}", description=f"**[{info.get('title')}]({info.get('webpage_url', '')})**", color=0x5865F2)
     if 'thumbnail' in info: embed.set_thumbnail(url=info['thumbnail'])
@@ -100,13 +106,20 @@ class Music(commands.Cog):
 
     def play_next(self, ctx):
         guild_id = ctx.guild.id
+        if not ctx.voice_client:
+            return
         if guild_id in music_queues and len(music_queues[guild_id]) > 0:
             info = music_queues[guild_id].pop(0)
             play_history[guild_id] = info
-            source = discord.FFmpegPCMAudio(info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
-            ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
-            coro = ctx.channel.send(embed=make_music_embed(info, "Hàng Đợi Kế Tiếp"), view=MusicControlView())
-            asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
+            try:
+                source = discord.FFmpegPCMAudio(info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
+                ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
+                coro = ctx.channel.send(embed=make_music_embed(info, "Hàng Đợi Kế Tiếp"), view=MusicControlView())
+                asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
+            except Exception as e:
+                print(f"[ERROR] Lỗi phát bài tiếp theo: {e}")
+                coro = ctx.channel.send(f"❌ Không thể phát bài tiếp theo trong hàng đợi: {e}")
+                asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         else:
             if guild_id in play_history and guild_id not in autoplay_disabled:
                 last_song = play_history[guild_id]
@@ -123,12 +136,13 @@ class Music(commands.Cog):
                             if len(candidates) > 0:
                                 next_info = random.choice(candidates)
                                 play_history[guild_id] = next_info
-                                source = discord.FFmpegPCMAudio(next_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
-                                ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
-                                await status_msg.edit(content=None, embed=make_music_embed(next_info, "🎵 Nhạc Đề Xuất (AutoPlay)"), view=MusicControlView())
-                                return
-                    except:
-                        pass
+                                if ctx.voice_client:
+                                    source = discord.FFmpegPCMAudio(next_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
+                                    ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
+                                    await status_msg.edit(content=None, embed=make_music_embed(next_info, "🎵 Nhạc Đề Xuất (AutoPlay)"), view=MusicControlView())
+                                    return
+                    except Exception as e:
+                        print(f"[ERROR] Lỗi tự động phát: {e}")
                     await status_msg.edit(content="⏸️ Hàng đợi trống. (Tạm tắt đề xuất do cạn kho nhạc tương thích).")
                 asyncio.run_coroutine_threadsafe(auto_play_task(), self.bot.loop)
 
@@ -186,7 +200,11 @@ class Music(commands.Cog):
             query = f"scsearch:{search}" if not search.startswith("http") else search
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
                 
-        results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
+        try:
+            results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
+        except Exception as e:
+            return await status_msg.edit(content=f"❌ Lỗi khi tìm kiếm hoặc phân tích bài hát: {e}")
+            
         if not results: return await status_msg.edit(content=f"❌ Không tìm thấy bài hát nào!")
         
         guild_id = ctx.guild.id
@@ -213,14 +231,28 @@ class Music(commands.Cog):
             if not vc.is_connected():
                 return await status_msg.edit(content="❌ Mất kết nối tới Kênh Thoại giữa chừng. Vui lòng gọi lại lệnh!")
             play_history[guild_id] = first_info
-            vc.play(discord.FFmpegPCMAudio(first_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS), after=lambda e: self.play_next(ctx))
-            await status_msg.edit(content=None, embed=make_music_embed(first_info, "Bắt Đầu Phát"), view=MusicControlView())
+            
+            try:
+                source = discord.FFmpegPCMAudio(first_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
+                vc.play(source, after=lambda e: self.play_next(ctx))
+            except Exception as e:
+                return await status_msg.edit(content=f"❌ Lỗi khởi chạy phát nhạc qua FFmpeg: {e}\n👉 Vui lòng kiểm tra lại đường dẫn ffmpeg hoặc link nhạc.")
+                
+            try:
+                await status_msg.edit(content=None, embed=make_music_embed(first_info, "Bắt Đầu Phát"), view=MusicControlView())
+            except Exception as e:
+                print(f"[ERROR] Không hiển thị được embed bài hát: {e}")
+                await ctx.send(f"🎶 **Bắt Đầu Phát:** {first_info.get('title', 'Unknown')}", view=MusicControlView())
+                
             if len(entries_to_add) > 1:
                 await ctx.channel.send(f"✅ Đã tải xong playlist **{playlist_title}** và đưa **{len(entries_to_add)-1}** bài còn lại vào hàng đợi!")
         else:
             pos = len(music_queues[guild_id]) - len(entries_to_add) + 1
             embed_title = f"{msg_text} (Vị trí thứ {pos})"
-            await status_msg.edit(content=None, embed=make_music_embed(first_info, embed_title))
+            try:
+                await status_msg.edit(content=None, embed=make_music_embed(first_info, embed_title))
+            except Exception as e:
+                await ctx.send(f"➕ **Đã thêm vào hàng đợi:** {first_info.get('title', 'Unknown')} (Vị trí thứ {pos})")
 
     @commands.hybrid_command(name=config.get("cmd_skip", "skip") or "skip")
     async def skip(self, ctx):
@@ -257,7 +289,10 @@ class Music(commands.Cog):
         embed = discord.Embed(title="📜 Hàng Đợi Kế Tiếp", color=0x5865F2)
         q = music_queues[guild_id]
         for i, info in enumerate(q[:10]):
-            duration = info.get('duration', 0)
+            try:
+                duration = int(float(info.get('duration') or 0))
+            except (ValueError, TypeError):
+                duration = 0
             dur_str = f"{duration//60}:{duration%60:02d}" if duration else "Trực tiếp"
             embed.add_field(name=f"`#{i+1}` {info.get('title', 'Unknown')[:50]}", value=f"⏱ {dur_str} · 👤 {info.get('uploader', '?')}", inline=False)
         
