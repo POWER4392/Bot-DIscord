@@ -124,7 +124,12 @@ class Music(commands.Cog):
                 await ctx.voice_client.move_to(ctx.author.voice.channel)
             vc = ctx.voice_client
         else:
-            vc = await ctx.author.voice.channel.connect()
+            try:
+                vc = await ctx.author.voice.channel.connect(timeout=20.0)
+            except asyncio.TimeoutError:
+                return await ctx.send("❌ **Lỗi Timeout:** Mạng đang bị nghẽn hoặc bot bị kẹt phiên cũ.\n👉 **Cách sửa 1:** Kích chuột phải vào bot ở Kênh Thoại -> Chọn **Ngắt kết nối (Disconnect)** rồi gọi lại lệnh.\n👉 **Cách sửa 2:** Đổi Region (Vùng) của Kênh Thoại sang khu vực khác (Automatic, US hoặc Japan)!")
+            except Exception as e:
+                return await ctx.send(f"❌ Lỗi tham gia kênh thoại: {e}")
             
         async with ctx.typing():
             status_msg = await ctx.send("🔍 Đang kết nối với vệ tinh âm thanh...")
