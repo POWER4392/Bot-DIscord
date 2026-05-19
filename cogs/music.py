@@ -138,51 +138,54 @@ class Music(commands.Cog):
         except: pass
         if not ctx.author.voice: return await ctx.send("Vào voice đi bạn ơi!")
         
-        if ctx.voice_client:
-            if ctx.voice_client.channel != ctx.author.voice.channel:
-                await ctx.voice_client.move_to(ctx.author.voice.channel)
-            vc = ctx.voice_client
+        vc = ctx.voice_client
+        if vc:
+            if not vc.is_connected():
+                try: await vc.disconnect(force=True)
+                except: pass
+                vc = await ctx.author.voice.channel.connect(timeout=20.0)
+            elif vc.channel != ctx.author.voice.channel:
+                await vc.move_to(ctx.author.voice.channel)
         else:
             try:
                 vc = await ctx.author.voice.channel.connect(timeout=20.0)
             except asyncio.TimeoutError:
-                return await ctx.send("❌ **Lỗi Timeout:** Mạng đang bị nghẽn hoặc bot bị kẹt phiên cũ.\n👉 **Cách sửa 1:** Kích chuột phải vào bot ở Kênh Thoại -> Chọn **Ngắt kết nối (Disconnect)** rồi gọi lại lệnh.\n👉 **Cách sửa 2:** Đổi Region (Vùng) của Kênh Thoại sang khu vực khác (Automatic, US hoặc Japan)!")
+                return await ctx.send("❌ **Lỗi Timeout:** Mạng đang bị nghẽn hoặc bot bị kẹt phiên cũ.\n👉 **Cách sửa:** Kích chuột phải vào bot ở Kênh Thoại -> Chọn **Ngắt kết nối** rồi gọi lại lệnh.")
             except Exception as e:
                 return await ctx.send(f"❌ Lỗi tham gia kênh thoại: {e}")
             
-        async with ctx.typing():
-            status_msg = await ctx.send("🔍 Đang kết nối với vệ tinh âm thanh...")
-            def fetch_youtube_data():
-                nonlocal search
-                if "spoti" in search and search.startswith("http"):
-                    try:
-                        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                        html = requests.get(search, headers=headers, timeout=5).text
-                        t_match = re.search(r'<title>(.*?)</title>', html)
-                        if t_match:
-                            title_text = t_match.group(1).replace(" - song and lyrics by ", " ")
-                            title_text = re.sub(r' \| Spotify$', '', title_text).replace("&#39;", "'").replace("&amp;", "&")
-                            search = title_text.strip()
-                        else: search = "Spotify unsupported DRM track"
-                    except: search = "Spotify fallback error"
-                
-                # YouTube Datacenter WAF Bypass: Bridge YouTube URLs to SoundCloud
-                if search.startswith("http") and ("youtube.com" in search or "youtu.be" in search):
-                    try:
-                        import requests
-                        oembed_url = f"https://www.youtube.com/oembed?url={search}&format=json"
-                        r = requests.get(oembed_url, timeout=5)
-                        if r.status_code == 200:
-                            yt_title = r.json().get('title', '')
-                            if yt_title:
-                                search = yt_title
-                    except Exception as e:
-                        pass # Fallback to normal URL handling if oEmbed fails
+        status_msg = await ctx.send("🔍 Đang kết nối với vệ tinh âm thanh...")
+        def fetch_youtube_data():
+            nonlocal search
+            if "spoti" in search and search.startswith("http"):
+                try:
+                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                    html = requests.get(search, headers=headers, timeout=5).text
+                    t_match = re.search(r'<title>(.*?)</title>', html)
+                    if t_match:
+                        title_text = t_match.group(1).replace(" - song and lyrics by ", " ")
+                        title_text = re.sub(r' \| Spotify$', '', title_text).replace("&#39;", "'").replace("&amp;", "&")
+                        search = title_text.strip()
+                    else: search = "Spotify unsupported DRM track"
+                except: search = "Spotify fallback error"
+            
+            # YouTube Datacenter WAF Bypass: Bridge YouTube URLs to SoundCloud
+            if search.startswith("http") and ("youtube.com" in search or "youtu.be" in search):
+                try:
+                    import requests
+                    oembed_url = f"https://www.youtube.com/oembed?url={search}&format=json"
+                    r = requests.get(oembed_url, timeout=5)
+                    if r.status_code == 200:
+                        yt_title = r.json().get('title', '')
+                        if yt_title:
+                            search = yt_title
+                except Exception as e:
+                    pass # Fallback to normal URL handling if oEmbed fails
 
-                query = f"scsearch:{search}" if not search.startswith("http") else search
-                with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
-                    
-            results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
+            query = f"scsearch:{search}" if not search.startswith("http") else search
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
+                
+        results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
             if not results: return await status_msg.edit(content=f"❌ Không tìm thấy bài hát nào!")
             
             guild_id = ctx.guild.id
