@@ -97,9 +97,7 @@ class VoiceNameModal(discord.ui.Modal, title="Đăng Ký Khởi Tạo Phòng Tho
                     if new_channel.id in temp_voices: temp_voices.remove(new_channel.id)
             except: pass
             
-        import inspect
-        bot = [v for k,v in inspect.currentframe().f_back.f_locals.items() if hasattr(v, 'loop')][0] if hasattr(interaction.client, 'loop') else interaction.client
-        bot.loop.create_task(cleanup_unjoined())
+        asyncio.create_task(cleanup_unjoined())
 
 class VoiceGeneratorView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
