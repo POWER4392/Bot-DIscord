@@ -1,2 +1,5 @@
+[providers]
+node = "20"
+
 [phases.setup]
-aptPkgs = ["ffmpeg", "libopus-dev", "libsodium-dev", "nodejs"]
+aptPkgs = ["ffmpeg", "libopus-dev", "libsodium-dev"]
