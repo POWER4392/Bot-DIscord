@@ -1,0 +1,6 @@
+discord.py
+yt-dlp
+requests
+Pillow
+aiohttp
+psycopg2-binary
