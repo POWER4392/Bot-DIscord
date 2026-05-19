@@ -134,6 +134,8 @@ class Music(commands.Cog):
 
     @commands.hybrid_command(name=config.get("cmd_play", "play") or "play")
     async def play(self, ctx, *, search: str):
+        try: await ctx.defer()
+        except: pass
         if not ctx.author.voice: return await ctx.send("Vào voice đi bạn ơi!")
         
         if ctx.voice_client:
@@ -188,7 +190,7 @@ class Music(commands.Cog):
             
             if 'entries' in results:
                 if not results['entries']: return await status_msg.edit(content=f"❌ Không tìm được bài.")
-                is_search = query.startswith("scsearch:") or query.startswith("ytsearch:")
+                is_search = not search.startswith("http")
                 entries_to_add = [results['entries'][0]] if is_search else results['entries']
                 first_info = entries_to_add[0]
                 playlist_title = results.get('title', 'Unknown Playlist')
