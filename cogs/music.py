@@ -166,22 +166,35 @@ class Music(commands.Cog):
             results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
             if not results: return await status_msg.edit(content=f"❌ Không tìm thấy bài hát nào!")
             
+            guild_id = ctx.guild.id
+            if guild_id not in music_queues: music_queues[guild_id] = []
+            
             if 'entries' in results:
-                if len(results['entries']) == 0: return await status_msg.edit(content=f"❌ Không tìm được bài.")
-                info = results['entries'][0]
+                if not results['entries']: return await status_msg.edit(content=f"❌ Không tìm được bài.")
+                is_search = query.startswith("scsearch:") or query.startswith("ytsearch:")
+                entries_to_add = [results['entries'][0]] if is_search else results['entries']
+                first_info = entries_to_add[0]
+                msg_text = "Danh Sách Chờ" if is_search else f"Đã thêm Playlist ({len(entries_to_add)} bài)"
             else:
-                info = results
+                entries_to_add = [results]
+                first_info = results
+                msg_text = "Danh Sách Chờ"
                 
-        guild_id = ctx.guild.id
-        if guild_id not in music_queues: music_queues[guild_id] = []
-        
-        if vc.is_playing() or vc.is_paused():
-            music_queues[guild_id].append(info)
-            await status_msg.edit(content=None, embed=make_music_embed(info, f"Danh Sách Chờ (Vị trí thứ {len(music_queues[guild_id])})"))
-        else:
-            play_history[guild_id] = info
-            vc.play(discord.FFmpegPCMAudio(info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS), after=lambda e: self.play_next(ctx))
-            await status_msg.edit(content=None, embed=make_music_embed(info, "Bắt Đầu Phát"), view=MusicControlView())
+            for info in entries_to_add:
+                if not info: continue
+                if vc.is_playing() or vc.is_paused() or info != first_info:
+                    music_queues[guild_id].append(info)
+                    
+            if not vc.is_playing() and not vc.is_paused():
+                play_history[guild_id] = first_info
+                vc.play(discord.FFmpegPCMAudio(first_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS), after=lambda e: self.play_next(ctx))
+                await status_msg.edit(content=None, embed=make_music_embed(first_info, "Bắt Đầu Phát"), view=MusicControlView())
+                if len(entries_to_add) > 1:
+                    await ctx.send(f"✅ Đã tải xong playlist và đưa **{len(entries_to_add)-1}** bài còn lại vào hàng đợi!")
+            else:
+                pos = len(music_queues[guild_id]) - len(entries_to_add) + 1
+                embed_title = f"{msg_text} (Vị trí thứ {pos})"
+                await status_msg.edit(content=None, embed=make_music_embed(first_info, embed_title))
 
     @commands.hybrid_command(name=config.get("cmd_skip", "skip") or "skip")
     async def skip(self, ctx):
