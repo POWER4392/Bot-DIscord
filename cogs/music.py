@@ -105,13 +105,13 @@ class Music(commands.Cog):
             play_history[guild_id] = info
             source = discord.FFmpegPCMAudio(info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
             ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
-            coro = ctx.send(embed=make_music_embed(info, "Hàng Đợi Kế Tiếp"), view=MusicControlView())
+            coro = ctx.channel.send(embed=make_music_embed(info, "Hàng Đợi Kế Tiếp"), view=MusicControlView())
             asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         else:
             if guild_id in play_history and guild_id not in autoplay_disabled:
                 last_song = play_history[guild_id]
                 async def auto_play_task():
-                    status_msg = await ctx.send("🔍 Đang rà đài phát bài ngẫu nhiên cùng phân khúc...")
+                    status_msg = await ctx.channel.send("🔍 Đang rà đài phát bài ngẫu nhiên cùng phân khúc...")
                     def fetch_related():
                         q = f"ytsearch10:{last_song.get('uploader', '')} {last_song.get('title', '').split()[0]} tracks"
                         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
@@ -134,27 +134,28 @@ class Music(commands.Cog):
 
     @commands.hybrid_command(name=config.get("cmd_play", "play") or "play")
     async def play(self, ctx, *, search: str):
-        try: await ctx.defer()
-        except: pass
-        if not ctx.author.voice: return await ctx.send("Vào voice đi bạn ơi!")
+        if not ctx.author.voice: return await ctx.send("❌ Vào voice đi bạn ơi!")
+        
+        status_msg = await ctx.send("🔍 Đang khởi động hệ thống âm thanh...")
         
         vc = ctx.voice_client
         if vc:
             if not vc.is_connected():
                 try: await vc.disconnect(force=True)
                 except: pass
-                vc = await ctx.author.voice.channel.connect(timeout=20.0)
+                try: vc = await ctx.author.voice.channel.connect(timeout=20.0)
+                except Exception as e: return await status_msg.edit(content=f"❌ Lỗi kết nối: {e}")
             elif vc.channel != ctx.author.voice.channel:
                 await vc.move_to(ctx.author.voice.channel)
         else:
             try:
                 vc = await ctx.author.voice.channel.connect(timeout=20.0)
             except asyncio.TimeoutError:
-                return await ctx.send("❌ **Lỗi Timeout:** Mạng đang bị nghẽn hoặc bot bị kẹt phiên cũ.\n👉 **Cách sửa:** Kích chuột phải vào bot ở Kênh Thoại -> Chọn **Ngắt kết nối** rồi gọi lại lệnh.")
+                return await status_msg.edit(content="❌ **Lỗi Timeout:** Mạng đang bị nghẽn hoặc bot bị kẹt phiên cũ.\n👉 **Cách sửa:** Kích chuột phải vào bot ở Kênh Thoại -> Chọn **Ngắt kết nối** rồi gọi lại lệnh.")
             except Exception as e:
-                return await ctx.send(f"❌ Lỗi tham gia kênh thoại: {e}")
-            
-        status_msg = await ctx.send("🔍 Đang kết nối với vệ tinh âm thanh...")
+                return await status_msg.edit(content=f"❌ Lỗi tham gia kênh thoại: {e}")
+                
+        await status_msg.edit(content="📡 Đang tìm kiếm bài hát...")
         def fetch_youtube_data():
             nonlocal search
             if "spoti" in search and search.startswith("http"):
@@ -209,11 +210,13 @@ class Music(commands.Cog):
                 music_queues[guild_id].append(info)
                 
         if not vc.is_playing() and not vc.is_paused():
+            if not vc.is_connected():
+                return await status_msg.edit(content="❌ Mất kết nối tới Kênh Thoại giữa chừng. Vui lòng gọi lại lệnh!")
             play_history[guild_id] = first_info
             vc.play(discord.FFmpegPCMAudio(first_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS), after=lambda e: self.play_next(ctx))
             await status_msg.edit(content=None, embed=make_music_embed(first_info, "Bắt Đầu Phát"), view=MusicControlView())
             if len(entries_to_add) > 1:
-                await ctx.send(f"✅ Đã tải xong playlist **{playlist_title}** và đưa **{len(entries_to_add)-1}** bài còn lại vào hàng đợi!")
+                await ctx.channel.send(f"✅ Đã tải xong playlist **{playlist_title}** và đưa **{len(entries_to_add)-1}** bài còn lại vào hàng đợi!")
         else:
             pos = len(music_queues[guild_id]) - len(entries_to_add) + 1
             embed_title = f"{msg_text} (Vị trí thứ {pos})"
