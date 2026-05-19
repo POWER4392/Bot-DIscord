@@ -150,6 +150,7 @@ class Music(commands.Cog):
     async def play(self, ctx, *, search: str):
         if not ctx.author.voice: return await ctx.send("❌ Vào voice đi bạn ơi!")
         
+        await ctx.defer()
         status_msg = await ctx.send("🔍 Đang khởi động hệ thống âm thanh...")
         
         vc = ctx.voice_client
