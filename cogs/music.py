@@ -157,7 +157,6 @@ class Music(commands.Cog):
                             yt_title = r.json().get('title', '')
                             if yt_title:
                                 search = yt_title
-                                await ctx.send(f"🔄 **YouTube Bypass:** Đang chuyển hướng bài hát `{yt_title}` sang máy chủ SoundCloud để né tường lửa...")
                     except Exception as e:
                         pass # Fallback to normal URL handling if oEmbed fails
 
