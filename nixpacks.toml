@@ -1,2 +1,2 @@
 [phases.setup]
-aptPkgs = ["ffmpeg", "libopus-dev", "libsodium-dev"]
+aptPkgs = ["ffmpeg", "libopus-dev", "libsodium-dev", "nodejs"]
