@@ -58,6 +58,23 @@ class MusicControlView(discord.ui.View):
         else:
             await interaction.response.send_message("❌ Hàng đợi phải có từ 2 bài trở lên mới đảo thuật toán được.", ephemeral=True)
             
+    @discord.ui.button(label="Hàng Đợi", style=discord.ButtonStyle.secondary, emoji="📜", custom_id="m_queue")
+    async def queue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild_id = interaction.guild.id
+        if guild_id not in music_queues or not music_queues[guild_id]:
+            return await interaction.response.send_message("📭 Hàng đợi hiện đang trống.", ephemeral=True)
+        
+        embed = discord.Embed(title="📜 Hàng Đợi Kế Tiếp", color=0x5865F2)
+        q = music_queues[guild_id]
+        for i, info in enumerate(q[:10]):
+            duration = info.get('duration', 0)
+            dur_str = f"{duration//60}:{duration%60:02d}" if duration else "Trực tiếp"
+            embed.add_field(name=f"`#{i+1}` {info.get('title', 'Unknown')[:50]}", value=f"⏱ {dur_str} · 👤 {info.get('uploader', '?')}", inline=False)
+        
+        if len(q) > 10:
+            embed.set_footer(text=f"Và {len(q)-10} bài khác nữa...")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+            
     @discord.ui.button(label="Tự Động Phát", style=discord.ButtonStyle.secondary, emoji="🎲", custom_id="m_autoplay")
     async def autoplay_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild_id = interaction.guild.id
@@ -174,7 +191,8 @@ class Music(commands.Cog):
                 is_search = query.startswith("scsearch:") or query.startswith("ytsearch:")
                 entries_to_add = [results['entries'][0]] if is_search else results['entries']
                 first_info = entries_to_add[0]
-                msg_text = "Danh Sách Chờ" if is_search else f"Đã thêm Playlist ({len(entries_to_add)} bài)"
+                playlist_title = results.get('title', 'Unknown Playlist')
+                msg_text = "Danh Sách Chờ" if is_search else f"Playlist: {playlist_title}"
             else:
                 entries_to_add = [results]
                 first_info = results
@@ -190,7 +208,7 @@ class Music(commands.Cog):
                 vc.play(discord.FFmpegPCMAudio(first_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS), after=lambda e: self.play_next(ctx))
                 await status_msg.edit(content=None, embed=make_music_embed(first_info, "Bắt Đầu Phát"), view=MusicControlView())
                 if len(entries_to_add) > 1:
-                    await ctx.send(f"✅ Đã tải xong playlist và đưa **{len(entries_to_add)-1}** bài còn lại vào hàng đợi!")
+                    await ctx.send(f"✅ Đã tải xong playlist **{playlist_title}** và đưa **{len(entries_to_add)-1}** bài còn lại vào hàng đợi!")
             else:
                 pos = len(music_queues[guild_id]) - len(entries_to_add) + 1
                 embed_title = f"{msg_text} (Vị trí thứ {pos})"
