@@ -1,0 +1,12 @@
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.youtube.com	TRUE	/	TRUE	1779180718	GPS	1
+.youtube.com	TRUE	/	TRUE	1813738929	PREF	f4=4000000&f6=40000000&tz=Asia.Saigon
+.youtube.com	TRUE	/	TRUE	1779179580	CONSISTENCY	AHzIXrxijYf-G-lbmsMtYkhaW7ldi5LHc-f0eFi8DwWjNOYcdJuPpalOLR4O71KWU_Z45Vv4NUu5XaKD4-jEMeb9aMKJj_YZ4o1aha8MlvR2k94cD-wnXulL3Ok6cIpvGEIeS6WeIXSEfbUg0TbixUY
+.youtube.com	TRUE	/	TRUE	1794730917	__Secure-YNID	18.YT=RfCp9sHzvqDuBn3hRDAog-Ea3Uma_oc8jvpE_Njr3MAVYJfYiWRMNwxRJ0PTObBc9z_nSjad-Qn59nc_MdUXLAbUjrvtpcXo5HlTql59YCk9g0SMMZ2SAjoD7cu94IH5HbNHijfBUlb8x6QqWsi6CBzStnXvu1MxaA2zyf64FqXxhAaQexs4xDirhaBSXGUt6IvLU8jd294emfBcbPz2me3o4nEonmgyEdbavBebdk_-jPaXgKm8a_bb3SWIddoDcLTMZJkCAci72lOcaq5sj2TWEA0ys_o7VVoYstIqiQpkotFh0SXpSdyw9a-jH3dyst-jx21aQQvHKuaEtGDIbA
+.youtube.com	TRUE	/	TRUE	0	YSC	2FPjHJJIt1Y
+.youtube.com	TRUE	/	TRUE	1794730929	VISITOR_INFO1_LIVE	9BTbNl1uOdE
+.youtube.com	TRUE	/	TRUE	1794730929	VISITOR_PRIVACY_METADATA	CgJWThIEGgAgRQ%3D%3D
+.youtube.com	TRUE	/	TRUE	1794730919	__Secure-ROLLOUT_TOKEN	CIOn87av2MqA9QEQmuib-_XElAMYpv_X-_XElAM%3D
