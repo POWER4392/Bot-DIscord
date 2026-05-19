@@ -26,6 +26,25 @@ def is_mod():
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.blacklist_cache = {}
+        self.bot.loop.create_task(self.load_blacklist_cache())
+
+    async def load_blacklist_cache(self):
+        await self.bot.wait_until_ready()
+        def fetch_all():
+            with db_lock:
+                cursor.execute("SELECT guild_id, word FROM blacklists")
+                return cursor.fetchall()
+        try:
+            rows = await self.bot.loop.run_in_executor(None, fetch_all)
+            for guild_id, word in rows:
+                g_id = str(guild_id)
+                if g_id not in self.blacklist_cache:
+                    self.blacklist_cache[g_id] = []
+                self.blacklist_cache[g_id].append(word.strip().lower())
+            print(f"[AutoMod] Đã nạp thành công blacklist cache cho {len(self.blacklist_cache)} server.")
+        except Exception as e:
+            print(f"[AutoMod] Lỗi nạp blacklist cache: {e}")
 
     async def check_anti_nuke(self, guild, action_type):
         now = datetime.datetime.now().timestamp()
@@ -165,10 +184,7 @@ class Moderation(commands.Cog):
                 spam_tracker[guild_id][user_id].clear()
                 return
 
-        banned_words = []
-        with db_lock:
-            cursor.execute("SELECT word FROM blacklists WHERE guild_id=?", (guild_id,))
-            banned_words = [row[0] for row in cursor.fetchall()]
+        banned_words = self.blacklist_cache.get(guild_id, [])
             
         if banned_words and not is_mod_or_admin:
             banned_words = [w.strip().lower() for w in banned_words if w.strip()]
@@ -341,6 +357,12 @@ class Moderation(commands.Cog):
                 return await ctx.send(f"⚠️ Từ `{word}` đã tồn tại trong danh sách cấm.")
             cursor.execute("INSERT OR IGNORE INTO blacklists (guild_id, word) VALUES (?, ?)", (guild_id, word))
             conn.commit()
+            
+        if guild_id not in self.blacklist_cache:
+            self.blacklist_cache[guild_id] = []
+        if word not in self.blacklist_cache[guild_id]:
+            self.blacklist_cache[guild_id].append(word)
+            
         await ctx.send(f"✅ Đã thêm `{word}` vào danh sách từ cấm của Server.")
 
     @commands.hybrid_command(name=config.get("cmd_delword", "delword") or "delword")
@@ -354,6 +376,10 @@ class Moderation(commands.Cog):
                 return await ctx.send(f"⚠️ Từ `{word}` không nằm trong danh sách cấm.")
             cursor.execute("DELETE FROM blacklists WHERE guild_id=? AND word=?", (guild_id, word))
             conn.commit()
+            
+        if guild_id in self.blacklist_cache and word in self.blacklist_cache[guild_id]:
+            self.blacklist_cache[guild_id].remove(word)
+            
         await ctx.send(f"🗑️ Đã xoá `{word}` khỏi danh sách từ cấm của Server.")
 
 async def setup(bot):

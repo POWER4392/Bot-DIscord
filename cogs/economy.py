@@ -24,9 +24,9 @@ class Economy(commands.Cog):
         
         if user_id not in level_cooldown or current_time - level_cooldown[user_id] >= 60:
             level_cooldown[user_id] = current_time
-            db_get_user(guild_id, user_id)
+            await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
             earned_xp = random.randint(15, 25)
-            old_level, new_level = db_update_xp(guild_id, user_id, earned_xp)
+            old_level, new_level = await self.bot.loop.run_in_executor(None, db_update_xp, guild_id, user_id, earned_xp)
             
             if new_level > old_level:
                 await message.channel.send(f"🎉 Chúc mừng {message.author.mention}! Cày cuốc chăm chỉ đã giúp bạn đột phá lên **Cấp {new_level}**! 🚀 (+{earned_xp} XP)")
@@ -34,9 +34,11 @@ class Economy(commands.Cog):
     @commands.hybrid_command(name="top", description="Bảng xếp hạng XP Top 10 của Server.")
     async def leaderboard(self, ctx):
         guild_id = str(ctx.guild.id)
-        with db_lock:
-            cursor.execute("SELECT user_id, xp, level FROM users WHERE guild_id=? ORDER BY xp DESC LIMIT 10", (guild_id,))
-            rows = cursor.fetchall()
+        def fetch_leaderboard():
+            with db_lock:
+                cursor.execute("SELECT user_id, xp, level FROM users WHERE guild_id=? ORDER BY xp DESC LIMIT 10", (guild_id,))
+                return cursor.fetchall()
+        rows = await self.bot.loop.run_in_executor(None, fetch_leaderboard)
         if not rows:
             return await ctx.send("📊 Chưa có ai tích lũy XP trên server này!")
         
@@ -58,15 +60,17 @@ class Economy(commands.Cog):
         guild_id = str(ctx.guild.id)
         user_id = str(member.id)
         
-        current_data = db_get_user(guild_id, user_id)
+        current_data = await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
         xp, level = current_data[0], current_data[1]
         
         next_level_xp = int(100 * (level ** 1.5)) + 100
         
         sorted_users = []
-        with db_lock:
-            cursor.execute("SELECT user_id, xp FROM users WHERE guild_id=? ORDER BY xp DESC", (guild_id,))
-            sorted_users = cursor.fetchall()
+        def fetch_sorted_users():
+            with db_lock:
+                cursor.execute("SELECT user_id, xp FROM users WHERE guild_id=? ORDER BY xp DESC", (guild_id,))
+                return cursor.fetchall()
+        sorted_users = await self.bot.loop.run_in_executor(None, fetch_sorted_users)
             
         rank_pos = next((i + 1 for i, row in enumerate(sorted_users) if row[0] == str(member.id)), "?")
 
@@ -111,7 +115,7 @@ class Economy(commands.Cog):
     async def profile_cmd(self, ctx, member: discord.Member = None):
         member = member or ctx.author
         guild_id, user_id = str(ctx.guild.id), str(member.id)
-        data = db_get_user(guild_id, user_id)
+        data = await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
         xp, level = data[0], data[1]
         
         next_level_xp = int(100 * (level ** 1.5)) + 100

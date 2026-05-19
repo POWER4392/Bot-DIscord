@@ -36,9 +36,11 @@ async def export_server_data():
 @tasks.loop(minutes=1)
 async def check_timed_roles():
     now = datetime.datetime.now().timestamp()
-    with db_lock:
-        cursor.execute("SELECT guild_id, user_id, role_id FROM timed_roles WHERE expires_at <= ?", (now,))
-        expired = cursor.fetchall()
+    def get_expired():
+        with db_lock:
+            cursor.execute("SELECT guild_id, user_id, role_id FROM timed_roles WHERE expires_at <= ?", (now,))
+            return cursor.fetchall()
+    expired = await bot.loop.run_in_executor(None, get_expired)
         
     for guild_id, user_id, role_id in expired:
         guild = bot.get_guild(int(guild_id))
@@ -50,21 +52,26 @@ async def check_timed_roles():
                 except: pass
     
     if expired:
-        with db_lock:
-            cursor.executemany(
-                "DELETE FROM timed_roles WHERE guild_id=? AND user_id=? AND role_id=?",
-                expired
-            )
-            conn.commit()
+        def delete_expired():
+            with db_lock:
+                cursor.executemany(
+                    "DELETE FROM timed_roles WHERE guild_id=? AND user_id=? AND role_id=?",
+                    expired
+                )
+                conn.commit()
+        await bot.loop.run_in_executor(None, delete_expired)
 
 @tasks.loop(seconds=3)
 async def check_gui_tasks():
-    with db_lock:
-        cursor.execute("SELECT id, action, payload FROM gui_tasks")
-        tasks_list = cursor.fetchall()
-        for t in tasks_list:
-            cursor.execute("DELETE FROM gui_tasks WHERE id=?", (t[0],))
-        conn.commit()
+    def get_and_delete_tasks():
+        with db_lock:
+            cursor.execute("SELECT id, action, payload FROM gui_tasks")
+            tasks_list = cursor.fetchall()
+            for t in tasks_list:
+                cursor.execute("DELETE FROM gui_tasks WHERE id=?", (t[0],))
+            conn.commit()
+            return tasks_list
+    tasks_list = await bot.loop.run_in_executor(None, get_and_delete_tasks)
     
     for task_id, action, payload in tasks_list:
         try:
