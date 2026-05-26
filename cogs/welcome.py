@@ -53,108 +53,159 @@ class VerificationView(discord.ui.View):
                 )
 
         # Check if there are custom questions in the database
-        def get_random_question():
+        question_count = int(server_cfg.get("verify_question_count", 1))
+
+        def get_random_questions(limit):
             with db_lock:
                 cursor.execute(
-                    "SELECT question, option_a, option_b, option_c, option_d, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY random() LIMIT 1",
-                    (guild_id,)
+                    "SELECT question, option_a, option_b, option_c, option_d, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY random() LIMIT ?",
+                    (guild_id, limit)
                 )
-                return cursor.fetchone()
+                return cursor.fetchall()
 
         try:
-            row = get_random_question()
+            rows = get_random_questions(question_count)
         except Exception as e:
             print(f"[Verification] Lỗi truy vấn câu hỏi: {e}")
-            row = None
+            rows = []
 
-        if row:
-            q_text, opt_a, opt_b, opt_c, opt_d, correct_opt = row
-            code = correct_opt.strip().upper()
-            embed = discord.Embed(
-                title="🔒 Xác Minh Tài Khoản",
-                description=(
-                    f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
-                    f"**{q_text}**\n\n"
-                    f"🇦 {opt_a}\n"
-                    f"🇧 {opt_b}\n"
-                    f"🇨 {opt_c}\n"
-                    f"🇩 {opt_d}\n\n"
-                    f"Nhập đáp án của bạn (chọn **A, B, C, hoặc D**) vào chat trong kênh này trong vòng **60 giây**."
-                ),
-                color=0x5865F2
-            )
-            embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+        if rows:
+            actual_count = len(rows)
+            for idx, row in enumerate(rows):
+                q_text, opt_a, opt_b, opt_c, opt_d, correct_opt = row
+                code = correct_opt.strip().upper()
+
+                embed = discord.Embed(
+                    title=f"🔒 Xác Minh Tài Khoản ({idx + 1}/{actual_count})",
+                    description=(
+                        f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
+                        f"**{q_text}**\n\n"
+                        f"🇦 {opt_a}\n"
+                        f"🇧 {opt_b}\n"
+                        f"🇨 {opt_c}\n"
+                        f"🇩 {opt_d}\n\n"
+                        f"Nhập đáp án của bạn (chọn **A, B, C, hoặc D**) vào chat trong kênh này trong vòng **60 giây**."
+                    ),
+                    color=0x5865F2
+                )
+                embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
+
+                if idx == 0:
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                else:
+                    await interaction.edit_original_response(embed=embed)
+
+                def check(m):
+                    return (
+                        m.author.id == member.id
+                        and m.channel == interaction.channel
+                    )
+
+                try:
+                    msg = await interaction.client.wait_for("message", check=check, timeout=60.0)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    if msg.content.strip().upper() != code:
+                        fail_embed = discord.Embed(
+                            title="❌ Sai Đáp Án",
+                            description="Bạn đã trả lời sai đáp án. Nhấn nút để bắt đầu xác minh lại từ đầu.",
+                            color=0xED4245
+                        )
+                        await interaction.followup.send(embed=fail_embed, ephemeral=True)
+                        return
+                except asyncio.TimeoutError:
+                    timeout_embed = discord.Embed(
+                        title="⏰ Hết Giờ",
+                        description="Bạn đã không trả lời trong vòng 60 giây. Nhấn nút để thử lại.",
+                        color=0xED4245
+                    )
+                    await interaction.followup.send(embed=timeout_embed, ephemeral=True)
+                    return
         else:
-            # Send math CAPTCHA as follow-up
-            a, b = random.randint(1, 9), random.randint(1, 9)
-            answer = a + b
-            code = str(answer)
+            # Fallback to Math CAPTCHAs
+            actual_count = question_count
+            for idx in range(actual_count):
+                a, b = random.randint(1, 9), random.randint(1, 9)
+                answer = a + b
+                code = str(answer)
 
-            embed = discord.Embed(
-                title="🔒 Xác Minh Tài Khoản",
-                description=(
-                    f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
-                    f"**{a} + {b} = ?**\n\n"
-                    f"Nhập đáp án vào chat trong kênh này trong vòng **60 giây**."
-                ),
-                color=0x5865F2
-            )
-            embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+                embed = discord.Embed(
+                    title=f"🔒 Xác Minh Tài Khoản ({idx + 1}/{actual_count})",
+                    description=(
+                        f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
+                        f"**{a} + {b} = ?**\n\n"
+                        f"Nhập đáp án vào chat trong kênh này trong vòng **60 giây**."
+                    ),
+                    color=0x5865F2
+                )
+                embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
 
-        def check(m):
-            return (
-                m.author.id == member.id
-                and m.channel == interaction.channel
-                and m.content.strip().upper() == code
-            )
+                if idx == 0:
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                else:
+                    await interaction.edit_original_response(embed=embed)
 
-        try:
-            msg = await interaction.client.wait_for("message", check=check, timeout=60.0)
-            try:
-                await msg.delete()
-            except Exception:
-                pass
+                def check(m):
+                    return (
+                        m.author.id == member.id
+                        and m.channel == interaction.channel
+                    )
 
-            # Grant auto-role
-            roles_granted = []
-            if auto_role_id:
-                auto_role = guild.get_role(int(auto_role_id))
-                if auto_role:
+                try:
+                    msg = await interaction.client.wait_for("message", check=check, timeout=60.0)
                     try:
-                        await member.add_roles(auto_role, reason="Xác minh thành công")
-                        roles_granted.append(auto_role.name)
-                    except discord.Forbidden:
+                        await msg.delete()
+                    except:
                         pass
+                    if msg.content.strip() != code:
+                        fail_embed = discord.Embed(
+                            title="❌ Sai Đáp Án",
+                            description="Bạn đã trả lời sai đáp án. Nhấn nút để bắt đầu xác minh lại từ đầu.",
+                            color=0xED4245
+                        )
+                        await interaction.followup.send(embed=fail_embed, ephemeral=True)
+                        return
+                except asyncio.TimeoutError:
+                    timeout_embed = discord.Embed(
+                        title="⏰ Hết Giờ",
+                        description="Bạn đã không trả lời trong vòng 60 giây. Nhấn nút để thử lại.",
+                        color=0xED4245
+                    )
+                    await interaction.followup.send(embed=timeout_embed, ephemeral=True)
+                    return
 
-            # Also remove a "pending" / "unverified" role if configured
-            pending_role_id = server_cfg.get("pending_role_id")
-            if pending_role_id:
-                pending_role = guild.get_role(int(pending_role_id))
-                if pending_role and pending_role in member.roles:
-                    try:
-                        await member.remove_roles(pending_role, reason="Đã xác minh")
-                    except Exception:
-                        pass
+        # Grant auto-role
+        roles_granted = []
+        if auto_role_id:
+            auto_role = guild.get_role(int(auto_role_id))
+            if auto_role:
+                try:
+                    await member.add_roles(auto_role, reason="Xác minh thành công")
+                    roles_granted.append(auto_role.name)
+                except discord.Forbidden:
+                    pass
 
-            success_embed = discord.Embed(
-                title="🎉 Xác Minh Thành Công!",
-                description=(
-                    f"Chào mừng **{member.display_name}** vào server!\n"
-                    + (f"Bạn đã được cấp vai trò: **{', '.join(roles_granted)}**" if roles_granted else "")
-                ),
-                color=0x57F287
-            )
-            await interaction.followup.send(embed=success_embed, ephemeral=True)
+        # Also remove a "pending" / "unverified" role if configured
+        pending_role_id = server_cfg.get("pending_role_id")
+        if pending_role_id:
+            pending_role = guild.get_role(int(pending_role_id))
+            if pending_role and pending_role in member.roles:
+                try:
+                    await member.remove_roles(pending_role, reason="Đã xác minh")
+                except Exception:
+                    pass
 
-        except asyncio.TimeoutError:
-            timeout_embed = discord.Embed(
-                title="⏰ Hết Giờ",
-                description="Bạn đã không trả lời trong 60 giây. Nhấn nút lại để thử lần khác.",
-                color=0xED4245
-            )
-            await interaction.followup.send(embed=timeout_embed, ephemeral=True)
+        success_embed = discord.Embed(
+            title="🎉 Xác Minh Thành Công!",
+            description=(
+                f"Chào mừng **{member.display_name}** vào server!\n"
+                + (f"Bạn đã được cấp vai trò: **{', '.join(roles_granted)}**" if roles_granted else "")
+            ),
+            color=0x57F287
+        )
+        await interaction.edit_original_response(embed=success_embed)
 
 
 # ─────────────────────────────────────────────

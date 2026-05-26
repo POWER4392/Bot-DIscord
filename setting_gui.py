@@ -209,6 +209,9 @@ def save_settings():
             sc["pending_role_id"] = next((r["id"] for r in current_server_data.get("roles", []) if r["name"] == sel_pending), None)
             sel_verify_ch = combo_verify_channel.get()
             sc["verify_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_verify_ch), None)
+            
+            q_cnt = entry_verify_question_count.get().strip()
+            sc["verify_question_count"] = int(q_cnt) if q_cnt.isdigit() else 1
 
             sc["mod_role_ids"] = [r["id"] for r in current_mod_roles]
             if "mod_role_id" in sc: del sc["mod_role_id"]
@@ -466,6 +469,10 @@ mv("🔐 KÊNH XÁC MINH (Kênh chứa panel CAPTCHA nút bấm):")
 combo_verify_channel = ctk.CTkComboBox(f_verify_section, values=["Không Yêu Cầu"], width=420)
 combo_verify_channel.pack(pady=(0, 10), padx=20)
 
+mv("📝 SỐ CÂU HỎI XÁC MINH (Số câu cần trả lời đúng, mặc định = 1):")
+entry_verify_question_count = ctk.CTkEntry(f_verify_section, width=420, placeholder_text="Ví dụ: 3")
+entry_verify_question_count.pack(pady=(0, 10), padx=20)
+
 ctk.CTkLabel(f_verify_section,
     text="💡 Sau khi Lưu cấu hình, gõ lệnh  .setup_verify #kênh  trong Discord để tạo nút bấm xác minh.",
     font=("Segoe UI", 10), text_color="#FEE75C", wraplength=460).pack(padx=20, pady=(0, 12))
@@ -707,6 +714,10 @@ def on_server_select(choice):
         combo_pending_role.set(next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == pending_rid), "Không Bật Xác Minh"))
         verify_cid = str(scf.get("verify_channel_id", ""))
         combo_verify_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == verify_cid), "Không Yêu Cầu"))
+        
+        q_count = scf.get("verify_question_count", 1)
+        entry_verify_question_count.delete(0, "end")
+        entry_verify_question_count.insert(0, str(q_count))
 
         rr_cid = str(scf.get("rr_channel_id", ""))
         combo_rr_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == rr_cid), "Không Yêu Cầu"))
