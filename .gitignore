@@ -9,8 +9,7 @@ build/
 ffmpeg.exe
 ffmpeg-*/
 
-# File chạy local
-setting_gui.py
+# File local không push
 bot_discloud.zip
 bot_upload.zip
 roles_list.json

@@ -86,18 +86,11 @@ class VoiceNameModal(discord.ui.Modal, title="Đăng Ký Khởi Tạo Phòng Tho
         )
         temp_voices.add(new_channel.id)
         
-        await interaction.response.send_message(f"✅ Bùm! Phòng của bạn đã được đắp lên: {new_channel.mention}\n*(Lưu ý: Bạn được cấp full quyền Sửa Tên & Khoá Kênh này. Kênh sẽ tự sát sau 60s nếu không ai nói chuyện).* ", ephemeral=True)
-        
-        async def cleanup_unjoined():
-            await asyncio.sleep(60)
-            try:
-                chan = guild.get_channel(new_channel.id)
-                if chan and len(chan.members) == 0:
-                    await chan.delete()
-                    if new_channel.id in temp_voices: temp_voices.remove(new_channel.id)
-            except: pass
-            
-        asyncio.create_task(cleanup_unjoined())
+        await interaction.response.send_message(
+            f"✅ Bùm! Phòng của bạn đã được đắp lên: {new_channel.mention}\n"
+            f"*(Bạn được cấp full quyền Sửa Tên & Khoá Kênh. Kênh sẽ tự động xoá khi không còn ai.)*",
+            ephemeral=True
+        )
 
 class VoiceGeneratorView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
@@ -171,17 +164,16 @@ class Utilities(commands.Cog):
                 try: await member.move_to(new_channel)
                 except: pass
             
+        # Xóa kênh tạm ngay khi kênh trống hoàn toàn (không có timer 60s)
         if before.channel and before.channel.id in temp_voices:
             if len(before.channel.members) == 0:
-                async def delete_after_delay(channel_id):
-                    await asyncio.sleep(60)
-                    try:
-                        chan = self.bot.get_channel(channel_id)
-                        if chan and len(chan.members) == 0:
-                            await chan.delete()
-                            if channel_id in temp_voices: temp_voices.remove(channel_id)
-                    except: pass
-                self.bot.loop.create_task(delete_after_delay(before.channel.id))
+                try:
+                    chan = self.bot.get_channel(before.channel.id)
+                    if chan and len(chan.members) == 0:
+                        await chan.delete()
+                        temp_voices.discard(before.channel.id)
+                except Exception:
+                    pass
 
     @commands.hybrid_command(name=config.get("cmd_ticket_setup", "ticket_setup") or "ticket_setup")
     @is_mod()
@@ -258,17 +250,7 @@ class Utilities(commands.Cog):
         try: await user.move_to(new_channel)
         except: pass
         
-        await ctx.send(f"✅ Đã kéo bạn vào phòng mới: {new_channel.mention}\n*(Phòng sẽ tự huỷ sau 60s nếu không có người)*")
-        
-        async def cleanup_unjoined():
-            await asyncio.sleep(60)
-            try:
-                chan = self.bot.get_channel(new_channel.id)
-                if chan and len(chan.members) == 0:
-                    await chan.delete()
-                    if new_channel.id in temp_voices: temp_voices.remove(new_channel.id)
-            except: pass
-        self.bot.loop.create_task(cleanup_unjoined())
+        await ctx.send(f"✅ Đã kéo bạn vào phòng mới: {new_channel.mention}\n*(Phòng sẽ tự xoá khi không còn ai)*")
 
 async def setup(bot):
     await bot.add_cog(Utilities(bot))

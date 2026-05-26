@@ -13,6 +13,7 @@ from core.api_server import start_api_server
 # Import Views for Persistent adding
 from cogs.music import MusicControlView
 from cogs.utilities import TicketView, TicketControlView, VoiceGeneratorView, PersistentRoleView
+from cogs.welcome import VerificationView
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -129,6 +130,7 @@ async def setup_hook():
     await bot.load_extension("cogs.economy")
     await bot.load_extension("cogs.utilities")
     await bot.load_extension("cogs.social")
+    await bot.load_extension("cogs.welcome")
     print("[THONG BAO] Đã tải xong Cogs.")
 
     # Đăng ký các Persistent Views
@@ -136,6 +138,7 @@ async def setup_hook():
     bot.add_view(TicketControlView())
     bot.add_view(MusicControlView())
     bot.add_view(VoiceGeneratorView())
+    bot.add_view(VerificationView())
     
     with db_lock:
         cursor.execute("SELECT message_id, roles_json FROM reaction_panels")
