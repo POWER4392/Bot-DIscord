@@ -109,6 +109,16 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS blacklists (
                     guild_id TEXT, word TEXT,
                     PRIMARY KEY (guild_id, word)
                 )''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS quiz_questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT,
+                    question TEXT,
+                    option_a TEXT,
+                    option_b TEXT,
+                    option_c TEXT,
+                    option_d TEXT,
+                    correct_option TEXT
+                )''')
 conn.commit()
 
 def db_get_user(guild_id, user_id):

@@ -130,6 +130,26 @@ class PersistentRoleView(discord.ui.View):
             self.add_item(RoleButton(r, custom_id))
 
 
+class QuizAnswerButton(discord.ui.Button):
+    def __init__(self, label, custom_id, correct_option):
+        super().__init__(label=label, style=discord.ButtonStyle.primary, custom_id=custom_id)
+        self.correct_option = correct_option
+
+    async def callback(self, interaction: discord.Interaction):
+        choice = self.custom_id.split("_")[-1]
+        if choice == self.correct_option:
+            await interaction.response.send_message(f"🎉 **Chính xác!** Bạn đã chọn đáp án **{choice}** là đáp án đúng.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"❌ **Sai rồi!** Đáp án **{choice}** không chính xác. Hãy thử lại nhé!", ephemeral=True)
+
+
+class QuizView(discord.ui.View):
+    def __init__(self, question_id, correct_option):
+        super().__init__(timeout=60)
+        for choice in ["A", "B", "C", "D"]:
+            self.add_item(QuizAnswerButton(label=choice, custom_id=f"quiz_{question_id}_{choice}", correct_option=correct_option))
+
+
 def is_mod():
     async def predicate(ctx):
         if ctx.author.guild_permissions.administrator: return True
@@ -251,6 +271,33 @@ class Utilities(commands.Cog):
         except: pass
         
         await ctx.send(f"✅ Đã kéo bạn vào phòng mới: {new_channel.mention}\n*(Phòng sẽ tự xoá khi không còn ai)*")
+
+    @commands.hybrid_command(name="quiz", description="Chơi trả lời câu hỏi trắc nghiệm")
+    async def quiz(self, ctx):
+        guild_id = str(ctx.guild.id)
+        def query_question():
+            with db_lock:
+                cursor.execute(
+                    "SELECT id, question, option_a, option_b, option_c, option_d, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY random() LIMIT 1",
+                    (guild_id,)
+                )
+                return cursor.fetchone()
+        row = await self.bot.loop.run_in_executor(None, query_question)
+        if not row:
+            return await ctx.send("❌ Máy chủ này chưa có câu hỏi nào. Admin vui lòng cấu hình câu hỏi thông qua GUI quản lý!")
+        q_id, q_text, opt_a, opt_b, opt_c, opt_d, correct_opt = row
+        embed = discord.Embed(
+            title="❓ THỬ THÁCH TRÍ TUỆ (QUIZ)",
+            description=f"**Câu hỏi:** {q_text}\n\n"
+                        f"🇦 {opt_a}\n"
+                        f"🇧 {opt_b}\n"
+                        f"🇨 {opt_c}\n"
+                        f"🇩 {opt_d}",
+            color=0xF1C40F
+        )
+        embed.set_footer(text="Nhấn vào nút bên dưới để chọn câu trả lời (Thông tin hiển thị riêng tư cho bạn)")
+        view = QuizView(q_id, correct_opt)
+        await ctx.send(embed=embed, view=view)
 
 async def setup(bot):
     await bot.add_cog(Utilities(bot))
