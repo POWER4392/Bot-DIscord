@@ -52,28 +52,62 @@ class VerificationView(discord.ui.View):
                     "✅ Bạn đã được xác minh rồi!", ephemeral=True
                 )
 
-        # Send math CAPTCHA as follow-up
-        a, b = random.randint(1, 9), random.randint(1, 9)
-        answer = a + b
-        code = str(answer)
+        # Check if there are custom questions in the database
+        def get_random_question():
+            with db_lock:
+                cursor.execute(
+                    "SELECT question, option_a, option_b, option_c, option_d, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY random() LIMIT 1",
+                    (guild_id,)
+                )
+                return cursor.fetchone()
 
-        embed = discord.Embed(
-            title="🔒 Xác Minh Tài Khoản",
-            description=(
-                f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
-                f"**{a} + {b} = ?**\n\n"
-                f"Nhập đáp án vào chat trong kênh này trong vòng **60 giây**."
-            ),
-            color=0x5865F2
-        )
-        embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        try:
+            row = get_random_question()
+        except Exception as e:
+            print(f"[Verification] Lỗi truy vấn câu hỏi: {e}")
+            row = None
+
+        if row:
+            q_text, opt_a, opt_b, opt_c, opt_d, correct_opt = row
+            code = correct_opt.strip().upper()
+            embed = discord.Embed(
+                title="🔒 Xác Minh Tài Khoản",
+                description=(
+                    f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
+                    f"**{q_text}**\n\n"
+                    f"🇦 {opt_a}\n"
+                    f"🇧 {opt_b}\n"
+                    f"🇨 {opt_c}\n"
+                    f"🇩 {opt_d}\n\n"
+                    f"Nhập đáp án của bạn (chọn **A, B, C, hoặc D**) vào chat trong kênh này trong vòng **60 giây**."
+                ),
+                color=0x5865F2
+            )
+            embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            # Send math CAPTCHA as follow-up
+            a, b = random.randint(1, 9), random.randint(1, 9)
+            answer = a + b
+            code = str(answer)
+
+            embed = discord.Embed(
+                title="🔒 Xác Minh Tài Khoản",
+                description=(
+                    f"Để chứng minh bạn không phải bot, hãy trả lời câu hỏi sau:\n\n"
+                    f"**{a} + {b} = ?**\n\n"
+                    f"Nhập đáp án vào chat trong kênh này trong vòng **60 giây**."
+                ),
+                color=0x5865F2
+            )
+            embed.set_footer(text="Chỉ mình bạn thấy thông báo này.")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
         def check(m):
             return (
                 m.author.id == member.id
                 and m.channel == interaction.channel
-                and m.content.strip() == code
+                and m.content.strip().upper() == code
             )
 
         try:
