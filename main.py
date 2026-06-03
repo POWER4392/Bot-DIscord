@@ -131,6 +131,7 @@ async def setup_hook():
     await bot.load_extension("cogs.utilities")
     await bot.load_extension("cogs.social")
     await bot.load_extension("cogs.welcome")
+    await bot.load_extension("cogs.ai_chatbot")
     print("[THONG BAO] Đã tải xong Cogs.")
 
     # Đăng ký các Persistent Views
