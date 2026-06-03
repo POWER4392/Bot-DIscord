@@ -59,6 +59,17 @@ def create_handle_api(bot):
             import core.shared as shared
             return web.json_response({"ok": True, "data": shared.server_data})
         
+        elif action == "GET_DASHBOARD_STATS":
+            import core.shared as shared
+            # Tra ve cac so lieu phuc vu dashboard admin
+            return web.json_response({
+                "ok": True,
+                "bot_status": "Online",
+                "total_servers": len(bot.guilds),
+                "ping_ms": round(bot.latency * 1000),
+                "loaded_cogs": list(bot.cogs.keys())
+            })
+            
         elif action == "STATUS":
             return web.json_response({
                 "ok": True,
