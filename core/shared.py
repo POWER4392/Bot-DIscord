@@ -1,19 +1,37 @@
 import os
 import json
 import threading
+import sys
+from dotenv import load_dotenv
+
+# Load local environment variables from .env
+load_dotenv()
+
+# Đọc đối số dòng lệnh để xác định file config
+config_file = "config.json"
+for arg in sys.argv:
+    if arg.startswith("--config="):
+        config_file = arg.split("=")[1]
+        break
 
 # Cấu hình
 config = {}
 try:
-    with open("config.json", "r", encoding="utf-8") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         config = json.load(f)
 except Exception as e:
-    print(f"❌ Lỗi đọc file config.json: {e}")
+    print(f"❌ Lỗi đọc file {config_file}: {e}")
+
+# Nạp đè/bổ sung cấu hình nhạy cảm từ biến môi trường để tăng tính bảo mật
+if os.environ.get("DISCORD_TOKEN"):
+    config["token"] = os.environ.get("DISCORD_TOKEN")
+if os.environ.get("API_SECRET"):
+    config["api_secret"] = os.environ.get("API_SECRET")
 
 # Database Lock
 db_lock = threading.Lock()
 
-DB_URL = os.environ.get("DATABASE_URL")
+DB_URL = os.environ.get("DATABASE_URL") or config.get("database_url")
 USE_PG = DB_URL is not None
 
 # Globals

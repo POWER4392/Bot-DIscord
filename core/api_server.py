@@ -7,7 +7,14 @@ import os
 def create_handle_api(bot):
     async def handle_api(request: web.Request):
         auth = request.headers.get("X-API-Key", "")
-        if auth != API_SECRET:
+        from core.shared import config_file
+        allowed_keys = config.get("api_secrets", [])
+        if not isinstance(allowed_keys, list):
+            allowed_keys = [allowed_keys]
+        if API_SECRET not in allowed_keys:
+            allowed_keys.append(API_SECRET)
+            
+        if auth not in allowed_keys:
             return web.json_response({"ok": False, "error": "Unauthorized"}, status=401)
         
         try:
@@ -30,11 +37,17 @@ def create_handle_api(bot):
             return web.json_response({"ok": True, "data": config})
             
         elif action == "UPDATE_CONFIG":
+            from core.shared import API_SECRET
+            if auth != API_SECRET:
+                return web.json_response({
+                    "ok": False, 
+                    "error": "Bạn không có quyền thay đổi cấu hình hệ thống (Chỉ Owner sở hữu Key chính mới có quyền này)."
+                }, status=403)
             try:
                 new_config = data.get("payload", {})
                 if not new_config:
                     return web.json_response({"ok": False, "error": "Empty payload"})
-                with open("config.json", "w", encoding="utf-8") as f:
+                with open(config_file, "w", encoding="utf-8") as f:
                     json.dump(new_config, f, indent=4, ensure_ascii=False)
                 config.clear()
                 config.update(new_config)

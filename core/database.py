@@ -71,7 +71,9 @@ if USE_PG:
     cursor = CloudDBCursor()
 else:
     os.makedirs("databases", exist_ok=True)
-    conn = sqlite3.connect("databases/bot_core.db", check_same_thread=False)
+    from core.shared import config
+    db_name = config.get("database_name", "bot_core")
+    conn = sqlite3.connect(f"databases/{db_name}.db", check_same_thread=False)
     cursor = conn.cursor()
 
 # Initialize tables

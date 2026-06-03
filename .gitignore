@@ -17,3 +17,11 @@ roles_list.json
 # Bảo mật — chứa token
 config.json
 databases/
+cookies.txt
+gui_settings.json
+.env
+*.log
+
+# Cấu hình IDE / Build
+.vscode/
+dist/

@@ -12,14 +12,39 @@ from PIL import Image, ImageTk, ImageDraw
 import customtkinter as ctk
 
 GUI_SETTINGS_FILE = "gui_settings.json"
-bot_process = None
+bot_processes = {}
 
 def load_gui_settings():
+    default_settings = {
+        "active_profile": "Default",
+        "profiles": {
+            "Default": {
+                "config_file": "config.json",
+                "remote_api_url": "",
+                "api_secret": "BOT_SECRET_KEY_2026"
+            }
+        }
+    }
     if os.path.exists(GUI_SETTINGS_FILE):
         try:
-            with open(GUI_SETTINGS_FILE, "r", encoding="utf-8") as f: return json.load(f)
+            with open(GUI_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if "profiles" in data:
+                    return data
+                else:
+                    # Migrate old format
+                    return {
+                        "active_profile": "Default",
+                        "profiles": {
+                            "Default": {
+                                "config_file": "config.json",
+                                "remote_api_url": data.get("remote_api_url", ""),
+                                "api_secret": data.get("api_secret", "BOT_SECRET_KEY_2026")
+                            }
+                        }
+                    }
         except: pass
-    return {"remote_api_url": "", "api_secret": "BOT_SECRET_KEY_2026"}
+    return default_settings
 
 gui_settings = load_gui_settings()
 
@@ -28,8 +53,10 @@ def _remote_request(action, extra_payload=None):
         url = entry_remote_url.get().strip().rstrip("/") + "/api"
         key = entry_remote_key.get().strip()
     except NameError:
-        url = gui_settings.get("remote_api_url", "").strip().rstrip("/") + "/api"
-        key = gui_settings.get("api_secret", "BOT_SECRET_KEY_2026").strip()
+        active = gui_settings.get("active_profile", "Default")
+        profile = gui_settings.get("profiles", {}).get(active, {})
+        url = profile.get("remote_api_url", "").strip().rstrip("/") + "/api"
+        key = profile.get("api_secret", "BOT_SECRET_KEY_2026").strip()
         
     if not url or "http" not in url: return None
     payload = {"action": action}
@@ -40,8 +67,20 @@ def _remote_request(action, extra_payload=None):
     except: return None
 
 def load_current_config():
-    resp = _remote_request("GET_CONFIG")
-    if resp and resp.get("ok"): return resp.get("data", {})
+    active = gui_settings.get("active_profile", "Default")
+    profile = gui_settings.get("profiles", {}).get(active, {})
+    url = profile.get("remote_api_url", "").strip().rstrip("/")
+    if url and "http" in url:
+        resp = _remote_request("GET_CONFIG")
+        if resp and resp.get("ok"): return resp.get("data", {})
+        
+    # Fallback to local config file
+    config_file = profile.get("config_file", "config.json")
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except: pass
     return {}
 
 def get_server_data():
@@ -50,34 +89,100 @@ def get_server_data():
     return {}
 
 # --- QUẢN LÝ TIẾN TRÌNH BOT ---
-def stop_bot():
-    global bot_process
-    if bot_process:
-        try:
-            parent = psutil.Process(bot_process.pid)
-            for child in parent.children(recursive=True): child.kill()
-            parent.kill()
-        except Exception: pass
-        bot_process = None
+def is_bot_running(profile_name):
+    proc = bot_processes.get(profile_name)
+    if proc and proc.poll() is None:
+        return True
+    
+    # Search system processes matching config filename
+    profile = gui_settings["profiles"].get(profile_name)
+    if not profile: return False
+    config_file = profile.get("config_file", "config.json")
     current_dir = os.path.abspath(os.path.dirname(__file__))
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+    for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
-            cmd = proc.info.get('cmdline') or []
-            if proc.info.get('name', '').lower().startswith('python') and 'main.py' in " ".join(cmd):
-                if any(current_dir in arg for arg in cmd):
-                    spider = psutil.Process(proc.info['pid'])
-                    for child in spider.children(recursive=True): child.kill()
-                    spider.kill()
+            cmd = proc_info.info.get('cmdline') or []
+            cmd_str = " ".join(cmd)
+            if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+                if f"--config={config_file}" in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+                    if any(current_dir in arg for arg in cmd):
+                        bot_processes[profile_name] = psutil.Process(proc_info.info['pid'])
+                        return True
         except: pass
-    if 'lbl_status' in globals(): lbl_status.configure(text="TRẠNG THÁI: ĐÃ DỪNG", text_color="#DA373C")
+    return False
+
+def update_status_label():
+    active = gui_settings.get("active_profile", "Default")
+    if is_bot_running(active):
+        if 'lbl_status' in globals():
+            lbl_status.configure(text=f"TRẠNG THÁI: ĐANG HOẠT ĐỘNG 🚀 ({active})", text_color="#23A559")
+    else:
+        if 'lbl_status' in globals():
+            lbl_status.configure(text=f"TRẠNG THÁI: ĐÃ DỪNG ({active})", text_color="#DA373C")
+
+def stop_bot():
+    active = gui_settings["active_profile"]
+    profile = gui_settings["profiles"].get(active)
+    if not profile: return
+    
+    # Check if this profile is remote (runs on cloud)
+    url = profile.get("remote_api_url", "").strip().rstrip("/")
+    if url and "http" in url:
+        return messagebox.showwarning("Cảnh báo", "Bot đang hoạt động ở chế độ Cloud từ xa. Bạn không thể điều khiển tiến trình chạy cục bộ.")
+        
+    config_file = profile.get("config_file", "config.json")
+    
+    # Stop tracked process
+    proc = bot_processes.get(active)
+    if proc:
+        try:
+            for child in proc.children(recursive=True): child.kill()
+            proc.kill()
+        except: pass
+        bot_processes[active] = None
+        
+    # Stop system processes matching config
+    current_dir = os.path.abspath(os.path.dirname(__file__))
+    for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmd = proc_info.info.get('cmdline') or []
+            cmd_str = " ".join(cmd)
+            if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+                if f"--config={config_file}" in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+                    if any(current_dir in arg for arg in cmd):
+                        spider = psutil.Process(proc_info.info['pid'])
+                        for child in spider.children(recursive=True): child.kill()
+                        spider.kill()
+        except: pass
+    update_status_label()
 
 def start_bot():
-    global bot_process
+    active = gui_settings["active_profile"]
+    profile = gui_settings["profiles"].get(active)
+    if not profile: return
+    
+    # Check if this profile is remote (runs on cloud)
+    url = profile.get("remote_api_url", "").strip().rstrip("/")
+    if url and "http" in url:
+        return messagebox.showwarning("Cảnh báo", "Bot đang hoạt động ở chế độ Cloud từ xa. Bạn không thể điều khiển tiến trình chạy cục bộ.")
+        
+    config_file = profile.get("config_file", "config.json")
+    
     stop_bot()
     try:
         import sys
-        bot_process = subprocess.Popen([sys.executable, "main.py"])
-        if 'lbl_status' in globals(): lbl_status.configure(text="TRẠNG THÁI: ĐANG HOẠT ĐỘNG 🚀", text_color="#23A559")
+        if not os.path.exists(config_file):
+            default_cfg = {
+                "token": "",
+                "prefix": "!",
+                "api_port": 8080,
+                "database_name": active.lower() + "_db"
+            }
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(default_cfg, f, indent=4, ensure_ascii=False)
+                
+        bot_processes[active] = subprocess.Popen([sys.executable, "main.py", f"--config={config_file}"])
+        update_status_label()
     except Exception as e: messagebox.showerror("Lỗi", f"Không thể bật Bot: {e}")
 
 def select_file(entry_widget, title, types):
@@ -149,8 +254,15 @@ def preview_position():
 # --- LƯU CẤU HÌNH ---
 def save_settings():
     try:
-        cfg["token"] = entry_token.get()
-        cfg["prefix"] = entry_prefix.get()
+        active = gui_settings.get("active_profile", "Default")
+        profile = gui_settings.get("profiles", {}).get(active, {})
+        config_file = profile.get("config_file", "config.json")
+
+        cfg["token"] = entry_token.get().strip()
+        cfg["prefix"] = entry_prefix.get().strip()
+        cfg["api_port"] = int(entry_api_port.get().strip()) if entry_api_port.get().strip().isdigit() else 8080
+        cfg["database_name"] = entry_database_name.get().strip() or "bot_core"
+
         cfg["cmd_play"] = entry_cmd_play.get()
         cfg["cmd_stop"] = entry_cmd_stop.get()
         cfg["cmd_skip"] = entry_cmd_skip.get()
@@ -212,6 +324,11 @@ def save_settings():
             
             q_cnt = entry_verify_question_count.get().strip()
             sc["verify_question_count"] = int(q_cnt) if q_cnt.isdigit() else 1
+            # Lưu danh sách câu hỏi cụ thể (nếu chọn chế độ Tùy Chọn)
+            if verify_mode_var.get() == "specific":
+                sc["verify_question_ids"] = [int(qid) for qid, var in quiz_check_vars.items() if var.get()]
+            else:
+                sc["verify_question_ids"] = []  # Về chế độ ngẫu nhiên
 
             sc["mod_role_ids"] = [r["id"] for r in current_mod_roles]
             if "mod_role_id" in sc: del sc["mod_role_id"]
@@ -225,10 +342,15 @@ def save_settings():
             sc["rr_title"] = entry_rr_title.get()
             sc["rr_roles_list"] = [r["id"] for r in current_rr_roles]
 
-        resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
-        if not resp or not resp.get("ok"):
-            messagebox.showerror("Lỗi", "Không thể lưu cấu hình lên Bot: " + (resp.get("error") if resp else "Mất kết nối"))
-            return False
+        url = profile.get("remote_api_url", "").strip().rstrip("/")
+        if url and "http" in url:
+            resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
+            if not resp or not resp.get("ok"):
+                messagebox.showerror("Lỗi", "Không thể lưu cấu hình lên Bot: " + (resp.get("error") if resp else "Mất kết nối"))
+                return False
+        else:
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
         messagebox.showerror("Lỗi", str(e))
@@ -236,6 +358,13 @@ def save_settings():
 
 def save_and_reset():
     if save_settings():
+        active = gui_settings["active_profile"]
+        profile = gui_settings["profiles"].get(active)
+        if profile:
+            url = profile.get("remote_api_url", "").strip().rstrip("/")
+            if url and "http" in url:
+                messagebox.showinfo("Thành công", "Đã lưu cấu hình lên Cloud thành công!")
+                return
         start_bot()
 
 # --- GIAO DIỆN CHÍNH ---
@@ -243,6 +372,146 @@ ctk.set_appearance_mode("dark")
 root = ctk.CTk()
 root.title("Quản Lý Bot Đa Server")
 root.geometry("540x950")
+
+# ================= PROFILE MANAGER =================
+f_prof_mgr = ctk.CTkFrame(root, fg_color="#1E1F22", corner_radius=10)
+f_prof_mgr.pack(fill="x", padx=10, pady=5)
+
+ctk.CTkLabel(f_prof_mgr, text="👤 Profile:", font=("Segoe UI", 12, "bold")).pack(side="left", padx=10, pady=5)
+
+def reload_gui_inputs():
+    global cfg, srv_data, current_server_id, current_server_data
+    
+    # Reload remote inputs first so that subsequent network requests use the correct new API URL/Key
+    active = gui_settings["active_profile"]
+    prof = gui_settings["profiles"][active]
+    entry_remote_url.delete(0, tk.END); entry_remote_url.insert(0, prof.get("remote_api_url", ""))
+    entry_remote_key.delete(0, tk.END); entry_remote_key.insert(0, prof.get("api_secret", "BOT_SECRET_KEY_2026"))
+    
+    cfg = load_current_config()
+    
+    # Reload entry fields
+    entry_token.delete(0, tk.END); entry_token.insert(0, cfg.get("token", ""))
+    entry_prefix.delete(0, tk.END); entry_prefix.insert(0, cfg.get("prefix", "!"))
+    entry_api_port.delete(0, tk.END); entry_api_port.insert(0, str(cfg.get("api_port", 8080)))
+    entry_database_name.delete(0, tk.END); entry_database_name.insert(0, cfg.get("database_name", "bot_core"))
+    
+    entry_cmd_play.delete(0, tk.END); entry_cmd_play.insert(0, cfg.get("cmd_play", "play"))
+    entry_cmd_stop.delete(0, tk.END); entry_cmd_stop.insert(0, cfg.get("cmd_stop", "stop"))
+    entry_cmd_skip.delete(0, tk.END); entry_cmd_skip.insert(0, cfg.get("cmd_skip", "skip"))
+    entry_cmd_pause.delete(0, tk.END); entry_cmd_pause.insert(0, cfg.get("cmd_pause", "pause"))
+    entry_cmd_resume.delete(0, tk.END); entry_cmd_resume.insert(0, cfg.get("cmd_resume", "resume"))
+    entry_cmd_ping.delete(0, tk.END); entry_cmd_ping.insert(0, cfg.get("cmd_ping", "ping"))
+    
+    entry_cmd_mute.delete(0, tk.END); entry_cmd_mute.insert(0, cfg.get("cmd_mute", "mute"))
+    entry_cmd_clear.delete(0, tk.END); entry_cmd_clear.insert(0, cfg.get("cmd_clear", "clear"))
+    entry_cmd_addword.delete(0, tk.END); entry_cmd_addword.insert(0, cfg.get("cmd_addword", "addword"))
+    entry_cmd_warn.delete(0, tk.END); entry_cmd_warn.insert(0, cfg.get("cmd_warn", "warn"))
+    
+    entry_cmd_kick.delete(0, tk.END); entry_cmd_kick.insert(0, cfg.get("cmd_kick", "kick"))
+    entry_cmd_ban.delete(0, tk.END); entry_cmd_ban.insert(0, cfg.get("cmd_ban", "ban"))
+    entry_cmd_delword.delete(0, tk.END); entry_cmd_delword.insert(0, cfg.get("cmd_delword", "delword"))
+    entry_cmd_timed_role.delete(0, tk.END); entry_cmd_timed_role.insert(0, cfg.get("cmd_timed_role", "timed_role"))
+    
+    entry_cmd_profile.delete(0, tk.END); entry_cmd_profile.insert(0, cfg.get("cmd_profile", "profile"))
+    entry_cmd_rank.delete(0, tk.END); entry_cmd_rank.insert(0, cfg.get("cmd_rank", "rank"))
+    entry_cmd_setup_voice.delete(0, tk.END); entry_cmd_setup_voice.insert(0, cfg.get("cmd_setup_voice", "setup_voice"))
+    entry_cmd_ticket_setup.delete(0, tk.END); entry_cmd_ticket_setup.insert(0, cfg.get("cmd_ticket_setup", "ticket_setup"))
+    
+    # Reload server lists
+    srv_data = get_server_data()
+    combo_servers.configure(values=["Chọn Server"] + [v["name"] for v in srv_data.values()])
+    combo_servers.set("Chọn Server")
+    
+    # Reset active server selection
+    current_server_id = None
+    current_server_data = {}
+    
+    # Update status label
+    update_status_label()
+
+def on_profile_change(choice):
+    if choice == "Chọn Profile...": return
+    gui_settings["active_profile"] = choice
+    try:
+        with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(gui_settings, f, indent=4, ensure_ascii=False)
+    except: pass
+    reload_gui_inputs()
+
+combo_profiles = ctk.CTkComboBox(f_prof_mgr, values=list(gui_settings["profiles"].keys()), width=180, command=on_profile_change)
+combo_profiles.set(gui_settings["active_profile"])
+combo_profiles.pack(side="left", padx=5, pady=5)
+
+def add_profile():
+    dialog = ctk.CTkInputDialog(text="Nhập tên Profile mới:", title="Thêm Profile")
+    val = dialog.get_input()
+    if not val: return
+    name = val.strip()
+    if not name or name in gui_settings["profiles"]:
+        return messagebox.showerror("Lỗi", "Tên profile không hợp lệ hoặc đã tồn tại!")
+        
+    config_file_name = f"config_{name.lower().replace(' ', '_')}.json"
+    
+    # Auto increment api port
+    ports = [8080]
+    for p in gui_settings["profiles"].values():
+        if os.path.exists(p.get("config_file", "")):
+            try:
+                with open(p["config_file"], "r", encoding="utf-8") as f:
+                    c = json.load(f)
+                    if c.get("api_port"): ports.append(c["api_port"])
+            except: pass
+    next_port = max(ports) + 1
+    
+    default_cfg = {
+        "token": "",
+        "prefix": "!",
+        "api_port": next_port,
+        "database_name": f"bot_{name.lower().replace(' ', '_')}"
+    }
+    try:
+        with open(config_file_name, "w", encoding="utf-8") as f:
+            json.dump(default_cfg, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        return messagebox.showerror("Lỗi", f"Không tạo được file cấu hình: {e}")
+        
+    gui_settings["profiles"][name] = {
+        "config_file": config_file_name,
+        "remote_api_url": "",
+        "api_secret": "BOT_SECRET_KEY_2026"
+    }
+    gui_settings["active_profile"] = name
+    
+    try:
+        with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(gui_settings, f, indent=4, ensure_ascii=False)
+    except: pass
+    
+    combo_profiles.configure(values=list(gui_settings["profiles"].keys()))
+    combo_profiles.set(name)
+    reload_gui_inputs()
+    messagebox.showinfo("Thành công", f"Đã thêm profile '{name}' và tạo file cấu hình '{config_file_name}'!")
+
+def delete_profile():
+    active = gui_settings["active_profile"]
+    if active == "Default":
+        return messagebox.showerror("Lỗi", "Không thể xóa Profile Default mặc định!")
+    if messagebox.askyesno("Xác nhận", f"Bạn có chắc muốn xóa Profile '{active}'?"):
+        stop_bot()
+        del gui_settings["profiles"][active]
+        gui_settings["active_profile"] = "Default"
+        try:
+            with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(gui_settings, f, indent=4, ensure_ascii=False)
+        except: pass
+        
+        combo_profiles.configure(values=list(gui_settings["profiles"].keys()))
+        combo_profiles.set("Default")
+        reload_gui_inputs()
+
+ctk.CTkButton(f_prof_mgr, text="➕ Thêm", width=60, fg_color="#23A559", hover_color="#1A7A41", command=add_profile).pack(side="left", padx=3)
+ctk.CTkButton(f_prof_mgr, text="✕ Xóa", width=60, fg_color="#DA373C", hover_color="#A12828", command=delete_profile).pack(side="left", padx=3)
 
 cfg = load_current_config()
 srv_data = get_server_data()
@@ -279,19 +548,23 @@ def mki(p, l, k, d=""):
     return e
 entry_token = mki(fc, "BOT TOKEN:", "token")
 entry_prefix = mki(fc, "PREFIX (Dấu bắt đầu lệnh):", "prefix", "!")
+entry_api_port = mki(fc, "CỔNG API (API PORT):", "api_port", "8080")
+entry_database_name = mki(fc, "TÊN DATABASE (DATABASE NAME):", "database_name", "bot_core")
 
 # --- REMOTE MODE (Kết nối Discloud / VPS) ---
 fr = ctk.CTkFrame(sf_system, fg_color="#1E2124", corner_radius=12, border_width=1, border_color="#F1C40F")
 fr.pack(pady=10, fill="x", padx=5)
 ctk.CTkLabel(fr, text="☁️ ĐIỀU KHIỂN BOT TỪ XA (DISCLOUD/VPS)", font=("Segoe UI", 15, "bold"), text_color="#F1C40F").pack(pady=10)
 ctk.CTkLabel(fr, text="Nhập địa chỉ Bot API (ví dụ: http://12.34.56.78:8080)", font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=20)
+active_prof_name = gui_settings.get("active_profile", "Default")
+active_prof = gui_settings.get("profiles", {}).get(active_prof_name, {})
 entry_remote_url = ctk.CTkEntry(fr, width=420, height=32, placeholder_text="http://xxx.xxx.xxx.xxx:8080")
-entry_remote_url.insert(0, gui_settings.get("remote_api_url", ""))
+entry_remote_url.insert(0, active_prof.get("remote_api_url", ""))
 entry_remote_url.pack(pady=(2,8), padx=20)
 
 ctk.CTkLabel(fr, text="API Secret Key:", font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=20)
 entry_remote_key = ctk.CTkEntry(fr, width=420, height=32, show="*", placeholder_text="BOT_SECRET_KEY_2026")
-entry_remote_key.insert(0, gui_settings.get("api_secret", "BOT_SECRET_KEY_2026"))
+entry_remote_key.insert(0, active_prof.get("api_secret", "BOT_SECRET_KEY_2026"))
 entry_remote_key.pack(pady=(2,8), padx=20)
 
 lbl_remote_status = ctk.CTkLabel(fr, text="⬤ Chưa kết nối", font=("Segoe UI", 12, "bold"), text_color="#72767D")
@@ -314,8 +587,10 @@ def ping_remote():
 def push_config_remote():
     if not save_settings():
         return
-    gui_settings["remote_api_url"] = entry_remote_url.get().strip()
-    gui_settings["api_secret"] = entry_remote_key.get().strip()
+    active = gui_settings["active_profile"]
+    prof = gui_settings["profiles"][active]
+    prof["remote_api_url"] = entry_remote_url.get().strip()
+    prof["api_secret"] = entry_remote_key.get().strip()
     with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(gui_settings, f, indent=4, ensure_ascii=False)
     
@@ -469,9 +744,121 @@ mv("🔐 KÊNH XÁC MINH (Kênh chứa panel CAPTCHA nút bấm):")
 combo_verify_channel = ctk.CTkComboBox(f_verify_section, values=["Không Yêu Cầu"], width=420)
 combo_verify_channel.pack(pady=(0, 10), padx=20)
 
-mv("📝 SỐ CÂU HỎI XÁC MINH (Số câu cần trả lời đúng, mặc định = 1):")
-entry_verify_question_count = ctk.CTkEntry(f_verify_section, width=420, placeholder_text="Ví dụ: 3")
-entry_verify_question_count.pack(pady=(0, 10), padx=20)
+# ── Chế độ câu hỏi Verify ──────────────────────────────────────────────
+mv("🎯 CHẾ ĐỘ CÂU HỎI XÁC MINH:")
+
+# Radio button để chọn chế độ
+import tkinter as tk
+verify_mode_var = tk.StringVar(value="random")
+
+f_mode_row = ctk.CTkFrame(f_verify_section, fg_color="transparent")
+f_mode_row.pack(fill="x", padx=20, pady=(0, 8))
+
+rb_random = ctk.CTkRadioButton(f_mode_row, text="🎲 Ngẫu Nhiên (random từ ngân hàng câu hỏi)",
+    variable=verify_mode_var, value="random",
+    font=("Segoe UI", 12), text_color="#00b4d8")
+rb_random.pack(side="top", anchor="w", pady=2)
+
+rb_specific = ctk.CTkRadioButton(f_mode_row, text="🎯 Tùy Chọn (chọn cụ thể câu hỏi bên dưới)",
+    variable=verify_mode_var, value="specific",
+    font=("Segoe UI", 12), text_color="#F1C40F")
+rb_specific.pack(side="top", anchor="w", pady=2)
+
+# Panel Random — hiển thị khi chọn random
+f_random_opts = ctk.CTkFrame(f_verify_section, fg_color="#162032", corner_radius=8)
+f_random_opts.pack(fill="x", padx=20, pady=(0, 6))
+ctk.CTkLabel(f_random_opts, text="Số câu hỏi sẽ hỏi (mặc định = 1):",
+    font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=12, pady=(8,2))
+entry_verify_question_count = ctk.CTkEntry(f_random_opts, width=420, placeholder_text="Ví dụ: 3")
+entry_verify_question_count.pack(padx=12, pady=(0, 10))
+
+# Panel Specific — hiển thị khi chọn specific
+f_specific_opts = ctk.CTkFrame(f_verify_section, fg_color="#1a1f0e", corner_radius=8)
+f_specific_opts.pack(fill="x", padx=20, pady=(0, 6))
+ctk.CTkLabel(f_specific_opts, text="Tích chọn các câu hỏi sẽ dùng khi xác minh:",
+    font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=12, pady=(8,2))
+
+# Checklist scrollable
+f_quiz_checklist = ctk.CTkScrollableFrame(f_specific_opts, fg_color="#111318", height=140)
+f_quiz_checklist.pack(fill="x", padx=12, pady=(0, 8))
+quiz_check_vars = {}   # {q_id: BooleanVar}
+quiz_check_widgets = []  # danh sách frame để xóa khi refresh
+
+ctk.CTkLabel(f_specific_opts,
+    text="💡 Tải danh sách câu hỏi: Chọn Server → nhấn 🔄 Tải Câu Hỏi bên dưới.",
+    font=("Segoe UI", 10), text_color="#888").pack(anchor="w", padx=12, pady=(0, 4))
+
+def refresh_verify_checklist():
+    """Tải danh sách câu hỏi từ DB vào checklist."""
+    global quiz_check_vars, quiz_check_widgets
+    for w in quiz_check_widgets:
+        try: w.destroy()
+        except: pass
+    quiz_check_widgets.clear()
+    quiz_check_vars.clear()
+
+    if not current_server_id:
+        lbl = ctk.CTkLabel(f_quiz_checklist, text="Chọn Server trước!", text_color="#DA373C")
+        lbl.pack()
+        quiz_check_widgets.append(lbl)
+        return
+
+    resp = _remote_request("DB_QUERY", {
+        "query": "SELECT id, question, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY id",
+        "params": [str(current_server_id)]
+    })
+
+    if not resp or not resp.get("ok") or not resp.get("data"):
+        lbl = ctk.CTkLabel(f_quiz_checklist,
+            text="Không có câu hỏi nào. Thêm câu hỏi tại tab ❓ CÂU HỎI.",
+            text_color="#888")
+        lbl.pack(pady=10)
+        quiz_check_widgets.append(lbl)
+        return
+
+    # Lấy danh sách ID đã chọn từ config để pre-tick
+    scf = cfg.get("servers", {}).get(current_server_id, {})
+    pinned = [str(i) for i in scf.get("verify_question_ids", [])]
+
+    for row in resp["data"]:
+        q_id = str(row["id"])
+        q_text = row["question"]
+        correct = row["correct_option"]
+
+        var = tk.BooleanVar(value=(q_id in pinned))
+        quiz_check_vars[q_id] = var
+
+        short = q_text[:65] + "..." if len(q_text) > 65 else q_text
+        cb = ctk.CTkCheckBox(
+            f_quiz_checklist,
+            text=f"[ID:{q_id}] {short}  ✔{correct}",
+            variable=var,
+            font=("Segoe UI", 11),
+            text_color="#ccc",
+            hover_color="#5865F2",
+            border_color="#5865F2"
+        )
+        cb.pack(anchor="w", padx=6, pady=2)
+        quiz_check_widgets.append(cb)
+
+def on_verify_mode_change(*_):
+    mode = verify_mode_var.get()
+    if mode == "random":
+        f_random_opts.pack(fill="x", padx=20, pady=(0, 6))
+        f_specific_opts.pack_forget()
+    else:
+        f_random_opts.pack_forget()
+        f_specific_opts.pack(fill="x", padx=20, pady=(0, 6))
+
+verify_mode_var.trace_add("write", on_verify_mode_change)
+
+# Nút tải checklist câu hỏi
+ctk.CTkButton(f_specific_opts, text="🔄 Tải Câu Hỏi", width=150,
+    fg_color="#2C2F33", hover_color="#3A3D42",
+    command=refresh_verify_checklist).pack(padx=12, pady=(0, 10))
+
+# Khởi tạo hiển thị ban đầu theo chế độ random
+on_verify_mode_change()
 
 ctk.CTkLabel(f_verify_section,
     text="💡 Sau khi Lưu cấu hình, gõ lệnh  .setup_verify #kênh  trong Discord để tạo nút bấm xác minh.",
@@ -718,6 +1105,18 @@ def on_server_select(choice):
         q_count = scf.get("verify_question_count", 1)
         entry_verify_question_count.delete(0, "end")
         entry_verify_question_count.insert(0, str(q_count))
+        # Restore verify mode
+        pinned_ids = scf.get("verify_question_ids", [])
+        if pinned_ids:
+            verify_mode_var.set("specific")
+        else:
+            verify_mode_var.set("random")
+        on_verify_mode_change()
+        # Refresh checklist nếu có dữ liệu server
+        try:
+            refresh_verify_checklist()
+        except:
+            pass
 
         rr_cid = str(scf.get("rr_channel_id", ""))
         combo_rr_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == rr_cid), "Không Yêu Cầu"))
@@ -741,20 +1140,49 @@ def on_server_select(choice):
 
 combo_servers.configure(command=on_server_select)
 
-lbl_status = ctk.CTkLabel(root, text="TRẠNG THÁI: CHƯA HOẠT ĐỘNG", text_color="#FEE75C", font=("Segoe UI", 16, "bold")); lbl_status.pack()
+lbl_status = ctk.CTkLabel(root, text="TRẠNG THÁI: ĐANG KIỂM TRA...", text_color="#FEE75C", font=("Segoe UI", 16, "bold")); lbl_status.pack()
 bfr = ctk.CTkFrame(root, fg_color="transparent"); bfr.pack(pady=5)
 ctk.CTkButton(bfr, text="▶ CHẠY BOT", height=40, font=("Segoe UI", 14, "bold"), fg_color="#23A559", command=start_bot).pack(side="left", padx=5)
 ctk.CTkButton(bfr, text="⏹ NGỪNG", height=40, font=("Segoe UI", 14, "bold"), fg_color="#DA373C", command=stop_bot).pack(side="left", padx=5)
 ctk.CTkButton(root, text="💾 LƯU CẤU HÌNH SERVER VÀ TÁI KHỞI ĐỘNG", height=40, font=("Segoe UI", 14, "bold"), fg_color="#5865F2", command=save_and_reset).pack(pady=(5,30))
 
-def on_closing(): stop_bot(); root.destroy(); os._exit(0)
+def on_closing():
+    for active in list(gui_settings["profiles"].keys()):
+        proc = bot_processes.get(active)
+        if proc:
+            try:
+                for child in proc.children(recursive=True): child.kill()
+                proc.kill()
+            except: pass
+            
+        profile = gui_settings["profiles"].get(active)
+        if profile:
+            config_file = profile.get("config_file", "config.json")
+            current_dir = os.path.abspath(os.path.dirname(__file__))
+            for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    cmd = proc_info.info.get('cmdline') or []
+                    cmd_str = " ".join(cmd)
+                    if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+                        if f"--config={config_file}" in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+                            if any(current_dir in arg for arg in cmd):
+                                spider = psutil.Process(proc_info.info['pid'])
+                                for child in spider.children(recursive=True): child.kill()
+                                spider.kill()
+                except: pass
+    root.destroy()
+    os._exit(0)
+
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # TAB SOCIAL MEDIA
-DB_PATH = os.path.join("databases", "bot_core.db")
+def get_db_path():
+    db_name = cfg.get("database_name", "bot_core")
+    return os.path.join("databases", f"{db_name}.db")
 
 def get_social_db():
-    if not os.path.exists(DB_PATH): return []
+    db_path = get_db_path()
+    if not os.path.exists(db_path): return []
     resp = _remote_request("DB_QUERY", {"query": "SELECT guild_id, platform, target_id, channel_id, ping_role FROM social_tracker"})
     if resp and resp.get("ok"):
         return [[r["guild_id"], r["platform"], r["target_id"], r["channel_id"], r["ping_role"]] for r in resp.get("data", [])]
@@ -1131,5 +1559,14 @@ quiz_list_frame.pack(fill="x", padx=5, pady=(0,10))
 # Load initial list
 refresh_quiz_list()
 
+def check_status_loop():
+    try:
+        update_status_label()
+    except: pass
+    root.after(2000, check_status_loop)
+
+# Load GUI fields with the active profile config
+reload_gui_inputs()
+check_status_loop()
 
 root.mainloop()

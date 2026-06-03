@@ -2,9 +2,10 @@ import discord
 from discord.ext import commands
 import asyncio
 import datetime
+import json
 import random
 import string
-from core.shared import config
+from core.shared import config, config_file
 from core.database import cursor, conn, db_lock
 
 
@@ -52,19 +53,31 @@ class VerificationView(discord.ui.View):
                     "✅ Bạn đã được xác minh rồi!", ephemeral=True
                 )
 
-        # Check if there are custom questions in the database
+        # Lấy danh sách ID câu hỏi cụ thể (nếu có) hoặc lấy ngẫu nhiên
         question_count = int(server_cfg.get("verify_question_count", 1))
+        pinned_ids = server_cfg.get("verify_question_ids", [])
 
-        def get_random_questions(limit):
+        def get_questions():
             with db_lock:
-                cursor.execute(
-                    "SELECT question, option_a, option_b, option_c, option_d, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY random() LIMIT ?",
-                    (guild_id, limit)
-                )
+                if pinned_ids:
+                    # Lấy đúng các câu hỏi được chỉ định, giữ nguyên thứ tự ngẫu nhiên
+                    placeholders = ",".join(["?"] * len(pinned_ids))
+                    cursor.execute(
+                        f"SELECT question, option_a, option_b, option_c, option_d, correct_option "
+                        f"FROM quiz_questions WHERE guild_id = ? AND id IN ({placeholders}) ORDER BY random()",
+                        [guild_id] + list(pinned_ids)
+                    )
+                else:
+                    # Lấy ngẫu nhiên theo số lượng đã cấu hình
+                    cursor.execute(
+                        "SELECT question, option_a, option_b, option_c, option_d, correct_option "
+                        "FROM quiz_questions WHERE guild_id = ? ORDER BY random() LIMIT ?",
+                        (guild_id, question_count)
+                    )
                 return cursor.fetchall()
 
         try:
-            rows = get_random_questions(question_count)
+            rows = get_questions()
         except Exception as e:
             print(f"[Verification] Lỗi truy vấn câu hỏi: {e}")
             rows = []
@@ -356,6 +369,192 @@ class Welcome(commands.Cog):
         view = VerificationView()
         await channel.send(embed=embed, view=view)
         await ctx.send(f"✅ Panel xác minh đã được tạo tại {channel.mention}!", ephemeral=True)
+
+    # ── Lệnh xem danh sách câu hỏi verify ────
+    @commands.hybrid_command(
+        name="verify_questions",
+        description="Xem toàn bộ câu hỏi verify có trong máy chủ (kèm ID)."
+    )
+    @commands.guild_only()  # Điều kiện A: chỉ dùng trong server
+    @is_mod()
+    async def verify_questions(self, ctx):
+        """Liệt kê tất cả câu hỏi trong DB của server, hiển thị ID để dùng với /set_verify_questions."""
+        guild_id = str(ctx.guild.id)
+        server_cfg = config.get("servers", {}).get(guild_id, config)
+
+        # Điều kiện B: chỉ dùng trong verify_channel (nếu đã cấu hình)
+        verify_channel_id = server_cfg.get("verify_channel_id")
+        if verify_channel_id and ctx.channel.id != int(verify_channel_id):
+            verify_ch = ctx.guild.get_channel(int(verify_channel_id))
+            mention = verify_ch.mention if verify_ch else f"<#{verify_channel_id}>"
+            return await ctx.send(
+                f"❌ Lệnh này chỉ được dùng trong kênh verify: {mention}",
+                ephemeral=True
+            )
+
+        def fetch_all():
+            with db_lock:
+                cursor.execute(
+                    "SELECT id, question, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY id",
+                    (guild_id,)
+                )
+                return cursor.fetchall()
+
+        rows = await self.bot.loop.run_in_executor(None, fetch_all)
+
+        if not rows:
+            return await ctx.send(
+                "❌ Chưa có câu hỏi nào. Thêm câu hỏi qua **GUI Quản Lý** trước nhé!",
+                ephemeral=True
+            )
+
+        pinned_ids = server_cfg.get("verify_question_ids", [])
+        mode_text = (
+            f"🎯 **Đang dùng câu hỏi cụ thể:** ID {', '.join(str(i) for i in pinned_ids)}"
+            if pinned_ids
+            else "🎲 **Chế độ hiện tại: Ngẫu nhiên** (dùng `/set_verify_questions` để chọn cụ thể)"
+        )
+
+        lines = []
+        for q_id, q_text, correct in rows:
+            marker = "✅" if (not pinned_ids or q_id in pinned_ids) else "⬜"
+            short = q_text[:60] + "..." if len(q_text) > 60 else q_text
+            lines.append(f"{marker} **[ID: {q_id}]** {short} *(Đáp án: {correct})*")
+
+        # Chia trang nếu nhiều câu hỏi
+        chunks, page = [], []
+        for line in lines:
+            page.append(line)
+            if len(page) >= 10:
+                chunks.append(page)
+                page = []
+        if page:
+            chunks.append(page)
+
+        for i, chunk in enumerate(chunks):
+            embed = discord.Embed(
+                title=f"📋 Danh Sách Câu Hỏi Verify ({i+1}/{len(chunks)})",
+                description=mode_text + "\n\n" + "\n".join(chunk),
+                color=0x5865F2
+            )
+            embed.set_footer(text=f"Tổng: {len(rows)} câu hỏi • Dùng /set_verify_questions để cấu hình")
+            await ctx.send(embed=embed, ephemeral=True)
+
+    # ── Lệnh cấu hình câu hỏi verify cụ thể ──
+    @commands.hybrid_command(
+        name="set_verify_questions",
+        description="Chọn câu hỏi cụ thể hoặc ngẫu nhiên cho bước xác minh."
+    )
+    @commands.guild_only()  # Điều kiện A: chỉ dùng trong server
+    @is_mod()
+    async def set_verify_questions(
+        self,
+        ctx,
+        ids: str = None
+    ):
+        """
+        Chọn câu hỏi cho verify theo ID.
+        - ids: danh sách ID cách nhau bằng dấu phẩy, VD: "1,3,5"
+        - Để trống (bỏ qua tham số) → về chế độ ngẫu nhiên
+        """
+        guild_id = str(ctx.guild.id)
+        server_cfg = config.get("servers", {}).get(guild_id, config)
+
+        # Điều kiện B: chỉ dùng trong verify_channel (nếu đã cấu hình)
+        verify_channel_id = server_cfg.get("verify_channel_id")
+        if verify_channel_id and ctx.channel.id != int(verify_channel_id):
+            verify_ch = ctx.guild.get_channel(int(verify_channel_id))
+            mention = verify_ch.mention if verify_ch else f"<#{verify_channel_id}>"
+            return await ctx.send(
+                f"❌ Lệnh này chỉ được dùng trong kênh verify: {mention}",
+                ephemeral=True
+            )
+
+        # Điều kiện C: phải có câu hỏi trong DB trước khi cho chọn cụ thể
+        if ids:
+            def check_has_questions():
+                with db_lock:
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM quiz_questions WHERE guild_id = ?",
+                        (guild_id,)
+                    )
+                    return cursor.fetchone()[0]
+
+            total = await self.bot.loop.run_in_executor(None, check_has_questions)
+            if total == 0:
+                return await ctx.send(
+                    "❌ Máy chủ chưa có câu hỏi nào trong ngân hàng.\n"
+                    "Hãy thêm câu hỏi qua **GUI Quản Lý** trước, sau đó dùng `/verify_questions` để xem ID.",
+                    ephemeral=True
+                )
+
+        # Parse danh sách ID
+        if ids:
+            try:
+                id_list = [int(x.strip()) for x in ids.split(",") if x.strip().isdigit()]
+            except Exception:
+                return await ctx.send("❌ Định dạng không hợp lệ. Hãy nhập danh sách ID cách nhau bằng dấu phẩy, VD: `1,3,5`", ephemeral=True)
+
+            if not id_list:
+                return await ctx.send("❌ Không tìm thấy ID hợp lệ nào.", ephemeral=True)
+
+            # Kiểm tra các ID có tồn tại trong DB không
+            def validate_ids():
+                with db_lock:
+                    placeholders = ",".join(["?"] * len(id_list))
+                    cursor.execute(
+                        f"SELECT id FROM quiz_questions WHERE guild_id = ? AND id IN ({placeholders})",
+                        [guild_id] + id_list
+                    )
+                    return [r[0] for r in cursor.fetchall()]
+
+            valid_ids = await self.bot.loop.run_in_executor(None, validate_ids)
+            invalid = [i for i in id_list if i not in valid_ids]
+
+            if invalid:
+                return await ctx.send(
+                    f"❌ Các ID sau không tồn tại trong máy chủ: **{', '.join(str(i) for i in invalid)}**\n"
+                    f"Dùng `/verify_questions` để xem danh sách ID hợp lệ.",
+                    ephemeral=True
+                )
+        else:
+            id_list = []  # Về chế độ ngẫu nhiên
+
+        # Lưu vào config
+        if "servers" not in config:
+            config["servers"] = {}
+        if guild_id not in config["servers"]:
+            config["servers"][guild_id] = {}
+
+        config["servers"][guild_id]["verify_question_ids"] = id_list
+
+        try:
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            return await ctx.send(f"❌ Không thể lưu cấu hình: {e}", ephemeral=True)
+
+        if id_list:
+            embed = discord.Embed(
+                title="✅ Đã Cấu Hình Câu Hỏi Verify",
+                description=(
+                    f"🎯 Bot sẽ hỏi **{len(id_list)} câu hỏi cụ thể** sau:\n\n"
+                    + "\n".join(f"• ID **{i}**" for i in id_list)
+                    + f"\n\nMỗi lần verify, {len(id_list)} câu này sẽ được hỏi theo thứ tự ngẫu nhiên."
+                ),
+                color=0x57F287
+            )
+        else:
+            embed = discord.Embed(
+                title="✅ Về Chế Độ Ngẫu Nhiên",
+                description=(
+                    f"🎲 Bot sẽ lấy ngẫu nhiên **{server_cfg.get('verify_question_count', 1)} câu hỏi** "
+                    f"từ toàn bộ ngân hàng câu hỏi mỗi lần verify."
+                ),
+                color=0x57F287
+            )
+        embed.set_footer(text="Dùng /verify_questions để xem danh sách câu hỏi kèm ID.")
+        await ctx.send(embed=embed, ephemeral=True)
 
     # ── Lệnh test chào mừng ───────────────────
     @commands.hybrid_command(
