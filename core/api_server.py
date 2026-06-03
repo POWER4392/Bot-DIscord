@@ -72,6 +72,30 @@ def create_handle_api(bot):
                 "active_voice_channels": len(bot.voice_clients)
             })
             
+        elif action == "GET_AI_STATUS":
+            gemini_key = os.environ.get("GEMINI_API_KEY", "")
+            return web.json_response({
+                "ok": True,
+                "gemini_api_configured": gemini_key != "",
+                "ai_channel_id": config.get("ai_channel_id", ""),
+                "ai_system_prompt": config.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
+            })
+            
+        elif action == "SET_AI_CONFIG":
+            from core.shared import API_SECRET, config_file
+            if auth != API_SECRET:
+                return web.json_response({"ok": False, "error": "Unauthorized"}, status=403)
+            try:
+                payload = data.get("payload", {})
+                config["ai_channel_id"] = payload.get("ai_channel_id", config.get("ai_channel_id", ""))
+                config["ai_system_prompt"] = payload.get("ai_system_prompt", config.get("ai_system_prompt", ""))
+                
+                with open(config_file, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=4, ensure_ascii=False)
+                return web.json_response({"ok": True, "msg": "Cấu hình AI đã được cập nhật thành công."})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
         elif action == "GET_AI_CHANNELS":
             # Tra ve danh sach cac text channel de lua chon lam kenh AI Chat
             channels = []
