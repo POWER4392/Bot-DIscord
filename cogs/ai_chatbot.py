@@ -1,3 +1,4 @@
+# Updated by duynguyen1012 (AI/ML Engineer)
 import discord
 from discord.ext import commands
 import google.generativeai as genai
