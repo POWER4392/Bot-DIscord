@@ -45,9 +45,12 @@ class AIChatbot(commands.Cog):
                 try:
                     # Chạy trong executor để tránh blocking event loop vì gemini-pro api đồng bộ
                     loop = self.bot.loop
+                    # Đọc prompt từ cấu hình động được cập nhật qua API
+                    system_prompt = config.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
+                    dynamic_model = genai.GenerativeModel('gemini-pro', system_instruction=system_prompt)
                     response = await loop.run_in_executor(
                         None, 
-                        lambda: self.model.generate_content(content)
+                        lambda: dynamic_model.generate_content(content)
                     )
                     reply_text = response.text
                     # Gioi han 2000 ky tu cua Discord
