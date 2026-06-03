@@ -61,14 +61,29 @@ def create_handle_api(bot):
         
         elif action == "GET_DASHBOARD_STATS":
             import core.shared as shared
-            # Tra ve cac so lieu phuc vu dashboard admin
+            # Tra ve cac so lieu phuc vu dashboard admin chi tiet
             return web.json_response({
                 "ok": True,
                 "bot_status": "Online",
                 "total_servers": len(bot.guilds),
-                "ping_ms": round(bot.latency * 1000),
-                "loaded_cogs": list(bot.cogs.keys())
+                "ping_ms": round(bot.latency * 1000) if bot.latency else 0,
+                "loaded_cogs": list(bot.cogs.keys()),
+                "total_users": sum(len(g.members) for g in bot.guilds),
+                "active_voice_channels": len(bot.voice_clients)
             })
+            
+        elif action == "GET_AI_CHANNELS":
+            # Tra ve danh sach cac text channel de lua chon lam kenh AI Chat
+            channels = []
+            for guild in bot.guilds:
+                for channel in guild.text_channels:
+                    channels.append({
+                        "guild_id": str(guild.id),
+                        "guild_name": guild.name,
+                        "channel_id": str(channel.id),
+                        "channel_name": channel.name
+                    })
+            return web.json_response({"ok": True, "channels": channels})
             
         elif action == "STATUS":
             return web.json_response({
