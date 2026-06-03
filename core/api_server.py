@@ -37,7 +37,6 @@ def create_handle_api(bot):
             return web.json_response({"ok": True, "data": config})
             
         elif action == "UPDATE_CONFIG":
-            from core.shared import API_SECRET
             if auth != API_SECRET:
                 return web.json_response({
                     "ok": False, 
@@ -82,7 +81,7 @@ def create_handle_api(bot):
             })
             
         elif action == "SET_AI_CONFIG":
-            from core.shared import API_SECRET, config_file
+            from core.shared import config_file
             if auth != API_SECRET:
                 return web.json_response({"ok": False, "error": "Unauthorized"}, status=403)
             try:
@@ -114,7 +113,7 @@ def create_handle_api(bot):
                 "ok": True,
                 "bot": str(bot.user),
                 "guilds": len(bot.guilds),
-                "latency_ms": round(bot.latency * 1000)
+                "latency_ms": round(bot.latency * 1000) if bot.latency is not None else 0
             })
             
         elif action == "DB_QUERY":
