@@ -2,6 +2,7 @@ import os
 import json
 import threading
 import sys
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 # Load local environment variables from .env
