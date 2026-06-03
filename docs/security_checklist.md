@@ -1,6 +1,6 @@
 # Bao cao Danh gia Security & QA Checklist - Tuan 3
 
-Bao cao duoc thuc hien boi **Mai Van Viet (QA & Security Engineer)**.
+Bao cao duoc thuc hien boi **QA & Security Team**.
 
 ## 1. Kich ban Kiem thu QA (Quality Assurance)
 Cac test cases da duoc thiet lap va xac nhan chay thanh cong tren local:
