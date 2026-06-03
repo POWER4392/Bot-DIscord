@@ -8,3 +8,4 @@ psycopg2-binary
 PyNaCl
 davey
 python-dotenv
+google-generativeai
