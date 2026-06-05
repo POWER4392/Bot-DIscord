@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Bot Web Dashboard - Admin Portal</title>
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="bot-avatar">
+                    <i data-lucide="bot"></i>
+                </div>
+                <div class="bot-info">
+                    <h2>Bot Admin</h2>
+                    <span class="status-badge online"><span class="dot"></span> Online</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#overview" class="nav-item active" data-tab="overview">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Tổng quan</span>
+                </a>
+                <a href="#ai-config" class="nav-item" data-tab="ai-config">
+                    <i data-lucide="sparkles"></i>
+                    <span>Cấu hình AI</span>
+                </a>
+                <a href="#reaction-roles" class="nav-item" data-tab="reaction-roles">
+                    <i data-lucide="shield-check"></i>
+                    <span>Reaction Roles</span>
+                </a>
+                <a href="#system-config" class="nav-item" data-tab="system-config">
+                    <i data-lucide="settings"></i>
+                    <span>Cấu hình Hệ thống</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="connection-status card-glass">
+                    <div class="flex-between">
+                        <span>API Server:</span>
+                        <span id="api-status-text" class="status-indicator-text offline">Đang kết nối...</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="connection-progress" class="progress-bar" style="width: 30%"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <header class="content-header">
+                <div class="header-title">
+                    <h1 id="page-title">Tổng quan hệ thống</h1>
+                    <p class="subtitle" id="page-subtitle">Giám sát hoạt động và thông số trực quan của Discord Bot.</p>
+                </div>
+                
+                <!-- API Connection settings -->
+                <div class="api-settings-bar card-glass">
+                    <div class="form-group-inline">
+                        <div class="input-wrapper">
+                            <i data-lucide="globe"></i>
+                            <input type="text" id="api-host" placeholder="http://localhost:8080" value="http://localhost:8080">
+                        </div>
+                        <div class="input-wrapper">
+                            <i data-lucide="key-round"></i>
+                            <input type="password" id="api-key" placeholder="API Secret Key" value="changeme123">
+                        </div>
+                        <button id="btn-reconnect" class="btn btn-primary btn-icon-only" title="Kết nối lại">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Alerts Container -->
+            <div id="alert-container" class="alert-container"></div>
+
+            <!-- Tab Sections -->
+            
+            <!-- SECTION 1: OVERVIEW -->
+            <section id="tab-overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon purple">
+                            <i data-lucide="server"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Máy chủ (Guilds)</h3>
+                            <div class="value" id="stat-servers">-</div>
+                            <span class="stat-desc">Đang quản lý</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon green">
+                            <i data-lucide="users"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Thành viên</h3>
+                            <div class="value" id="stat-users">-</div>
+                            <span class="stat-desc">Tổng số người dùng</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon blue">
+                            <i data-lucide="zap"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Độ trễ (Ping)</h3>
+                            <div class="value" id="stat-ping">-</div>
+                            <span class="stat-desc">Kết nối Discord Gateway</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon amber">
+                            <i data-lucide="mic"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Kênh thoại active</h3>
+                            <div class="value" id="stat-voice">-</div>
+                            <span class="stat-desc">Phát nhạc & Voice Temp</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-row">
+                    <!-- Loaded Modules List -->
+                    <div class="col-8 card-glass card-panel">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <i data-lucide="package"></i>
+                                <h3>Các Modules (Cogs) Đang Chạy</h3>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div id="cogs-list" class="badge-grid">
+                                <span class="badge badge-loading">Đang tải...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bot Info Panel -->
+                    <div class="col-4 card-glass card-panel">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <i data-lucide="info"></i>
+                                <h3>Thông tin Bot</h3>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="info-list">
+                                <div class="info-item">
+                                    <span class="label">Username:</span>
+                                    <span class="value text-highlight" id="info-username">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">ID:</span>
+                                    <span class="value" id="info-id">123456789012345678</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Phiên bản:</span>
+                                    <span class="value">v3.2.0 (Gemini Edition)</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Nền tảng:</span>
+                                    <span class="value text-gradient-purple">Render & Neon.tech</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 2: AI CONFIG -->
+            <section id="tab-ai-config" class="tab-content">
+                <div class="card-glass card-panel">
+                    <div class="panel-header flex-between">
+                        <div class="panel-title">
+                            <i data-lucide="sparkles"></i>
+                            <h3>Tích Hợp Chatbot AI Gemini</h3>
+                        </div>
+                        <div class="status-indicator" id="ai-api-status">
+                            <span class="status-badge offline"><span class="dot"></span> Chưa cấu hình API Key</span>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <form id="form-ai-config" class="settings-form">
+                            <div class="form-group">
+                                <label for="ai-channel-id">Kênh Trò Chuyện AI</label>
+                                <div class="select-wrapper">
+                                    <select id="ai-channel-id" class="form-control">
+                                        <option value="">-- Chọn kênh chat AI --</option>
+                                    </select>
+                                    <i data-lucide="chevron-down" class="select-arrow"></i>
+                                </div>
+                                <p class="help-text">Chọn kênh văn bản mà bot sẽ tự động trả lời bằng trí tuệ nhân tạo Gemini mà không cần phải mention.</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="ai-system-prompt">System Prompt (Chỉ dẫn hệ thống)</label>
+                                <textarea id="ai-system-prompt" rows="6" class="form-control" placeholder="Ví dụ: Bạn là một trợ lý ảo Discord thân thiện, vui vẻ. Thường xuyên sử dụng emoji..."></textarea>
+                                <p class="help-text">Xác định tính cách, vai trò và giọng văn của AI khi trò chuyện với các thành viên trong server.</p>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-lucide="save"></i>
+                                    Lưu Cấu Hình AI
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 3: REACTION ROLES -->
+            <section id="tab-reaction-roles" class="tab-content">
+                <div class="card-glass card-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i data-lucide="shield-check"></i>
+                            <h3>Tạo Bảng Tự Chọn Vai Trò (Reaction Roles)</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <form id="form-reaction-roles" class="settings-form">
+                            <div class="form-row">
+                                <div class="col-6 form-group">
+                                    <label for="rr-guild-id">Chọn Server (Guild)</label>
+                                    <div class="select-wrapper">
+                                        <select id="rr-guild-id" class="form-control">
+                                            <option value="">-- Chọn Server --</option>
+                                        </select>
+                                        <i data-lucide="chevron-down" class="select-arrow"></i>
+                                    </div>
+                                </div>
+                                <div class="col-6 form-group">
+                                    <label for="rr-channel-id">Kênh gửi bảng chọn Role</label>
+                                    <div class="select-wrapper">
+                                        <select id="rr-channel-id" class="form-control">
+                                            <option value="">-- Chọn kênh chat --</option>
+                                        </select>
+                                        <i data-lucide="chevron-down" class="select-arrow"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="col-12 form-group">
+                                    <label for="rr-title">Tiêu đề bảng Role</label>
+                                    <input type="text" id="rr-title" class="form-control" placeholder="Ví dụ: LỰA CHỌN VAI TRÒ HỌC TẬP" value="LỰA CHỌN VAI TRÒ HỌC TẬP">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="col-12 form-group">
+                                    <label for="rr-desc">Nội dung mô tả</label>
+                                    <textarea id="rr-desc" rows="3" class="form-control" placeholder="Nhấn vào nút bên dưới để nhận các vai trò phù hợp...">Nhấn vào các nút bên dưới để tự nhận / gỡ vai trò học tập và kết nối với server.</textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="flex-between">
+                                    <label>Danh sách các Role tự chọn (Tối đa 5)</label>
+                                    <button type="button" id="btn-add-role-item" class="btn btn-secondary btn-sm">
+                                        <i data-lucide="plus"></i> Thêm Role
+                                    </button>
+                                </div>
+                                <div id="rr-roles-container" class="rr-roles-container">
+                                    <!-- Role items will be dynamic -->
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="col-12 form-group">
+                                    <label for="rr-footer">Thông tin chân trang (Footer)</label>
+                                    <input type="text" id="rr-footer" class="form-control" placeholder="Ví dụ: Lưu ý: Bạn có thể click lại nút để hủy vai trò" value="Lưu ý: Bạn có thể click lại nút để hủy vai trò">
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-lucide="send"></i>
+                                    Gửi Panel Lên Server
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 4: SYSTEM CONFIG -->
+            <section id="tab-system-config" class="tab-content">
+                <div class="card-glass card-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i data-lucide="settings"></i>
+                            <h3>Cấu Hình Toàn Bộ Hệ Thống</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="alert-info card-glass">
+                            <i data-lucide="alert-circle"></i>
+                            <span>Lưu ý: Thay đổi các thông số cấu hình chính sẽ ghi đè trực tiếp lên tệp tin `config.json` ở server gốc. Vui lòng cẩn thận.</span>
+                        </div>
+                        <form id="form-system-config" class="settings-form">
+                            <div class="form-row">
+                                <div class="col-6 form-group">
+                                    <label for="sys-prefix">Prefix Lệnh (Tiền tố)</label>
+                                    <input type="text" id="sys-prefix" class="form-control" placeholder="Ví dụ: !" value="!">
+                                </div>
+                                <div class="col-6 form-group">
+                                    <label for="sys-api-port">Cổng HTTP API Server</label>
+                                    <input type="number" id="sys-api-port" class="form-control" placeholder="8080" value="8080">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="col-12 form-group">
+                                    <label for="sys-json">Nội dung cấu hình JSON thô</label>
+                                    <textarea id="sys-json" rows="12" class="form-control code-editor" placeholder="{}"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-lucide="save"></i>
+                                    Lưu Cấu Hình Toàn Cục
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
