@@ -316,19 +316,7 @@ def save_settings():
             sel_voice_category = combo_voice_category.get()
             sc["voice_category_id"] = next((str(c["id"]) for c in current_server_data.get("categories", []) if c["name"] == sel_voice_category), None)
 
-            # Xác minh thành viên
-            sel_pending = combo_pending_role.get()
-            sc["pending_role_id"] = next((r["id"] for r in current_server_data.get("roles", []) if r["name"] == sel_pending), None)
-            sel_verify_ch = combo_verify_channel.get()
-            sc["verify_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_verify_ch), None)
-            
-            q_cnt = entry_verify_question_count.get().strip()
-            sc["verify_question_count"] = int(q_cnt) if q_cnt.isdigit() else 1
-            # Lưu danh sách câu hỏi cụ thể (nếu chọn chế độ Tùy Chọn)
-            if verify_mode_var.get() == "specific":
-                sc["verify_question_ids"] = [int(qid) for qid, var in quiz_check_vars.items() if var.get()]
-            else:
-                sc["verify_question_ids"] = []  # Về chế độ ngẫu nhiên
+
 
             sc["mod_role_ids"] = [r["id"] for r in current_mod_roles]
             if "mod_role_id" in sc: del sc["mod_role_id"]
@@ -524,8 +512,6 @@ tab_system = tabview.add("⚙️ HỆ THỐNG")
 tab_cmds = tabview.add("📝 LỆNH TÙY BIẺN")
 tab_server = tabview.add("🌐 QUẢN LÝ SERVER")
 tab_social = tabview.add("📡 SOCIAL MEDIA")
-tab_quiz = tabview.add("❓ CÂU HỎI")
-
 sf_system = ctk.CTkScrollableFrame(tab_system, fg_color="transparent")
 sf_system.pack(fill="both", expand=True)
 sf_cmds = ctk.CTkScrollableFrame(tab_cmds, fg_color="transparent")
@@ -534,8 +520,6 @@ sf_server = ctk.CTkScrollableFrame(tab_server, fg_color="transparent")
 sf_server.pack(fill="both", expand=True)
 sf_social = ctk.CTkScrollableFrame(tab_social, fg_color="transparent")
 sf_social.pack(fill="both", expand=True)
-sf_quiz = ctk.CTkScrollableFrame(tab_quiz, fg_color="transparent")
-sf_quiz.pack(fill="both", expand=True)
 
 # --- KHỐI TOÀN CẦU ---
 fc = ctk.CTkFrame(sf_system, fg_color="#2B2D31", corner_radius=12); fc.pack(pady=10, fill="x")
@@ -726,144 +710,6 @@ ctk.CTkButton(fs_spec, text="👁 MỞ STUDIO KÉO THẢ AVATAR", fg_color="#586
 ms("AUTO ROLE (Gán tự động — khi không có xác minh):"); combo_auto_role = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_auto_role.pack(pady=(0,10), padx=20)
 ms("DANH MỤC LƯU PHÒNG THOẠI (Temp Voice):"); combo_voice_category = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu (Tạo thư mục mặc định)"], width=420); combo_voice_category.pack(pady=(0,10), padx=20)
 
-# ─── XÁC MINH THÀNH VIÊN ────────────────────────────────────────────────────
-f_verify_section = ctk.CTkFrame(sf_server, fg_color="#1E2836", corner_radius=12, border_width=1, border_color="#5865F2")
-f_verify_section.pack(pady=10, fill="x", padx=10)
-ctk.CTkLabel(f_verify_section, text="🔒 HỆ THỐNG XÁC MINH THÀNH VIÊN",
-             font=("Segoe UI", 16, "bold"), text_color="#5865F2").pack(pady=(12, 4))
-ctk.CTkLabel(f_verify_section,
-    text="Bật xác minh: thành viên mới nhận Pending Role → phải vượt CAPTCHA tại kênh Verify → mới nhận Auto Role.",
-    font=("Segoe UI", 11), text_color="#B5BAC1", wraplength=460).pack(padx=20, pady=(0, 8))
-
-def mv(l): ctk.CTkLabel(f_verify_section, text=l, font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=20)
-mv("⏳ PENDING ROLE (Role tạm – chưa xác minh, để 'Không Bật' = tắt hẳn xác minh):")
-combo_pending_role = ctk.CTkComboBox(f_verify_section, values=["Không Bật Xác Minh"], width=420)
-combo_pending_role.pack(pady=(0, 10), padx=20)
-
-mv("🔐 KÊNH XÁC MINH (Kênh chứa panel CAPTCHA nút bấm):")
-combo_verify_channel = ctk.CTkComboBox(f_verify_section, values=["Không Yêu Cầu"], width=420)
-combo_verify_channel.pack(pady=(0, 10), padx=20)
-
-# ── Chế độ câu hỏi Verify ──────────────────────────────────────────────
-mv("🎯 CHẾ ĐỘ CÂU HỎI XÁC MINH:")
-
-# Radio button để chọn chế độ
-import tkinter as tk
-verify_mode_var = tk.StringVar(value="random")
-
-f_mode_row = ctk.CTkFrame(f_verify_section, fg_color="transparent")
-f_mode_row.pack(fill="x", padx=20, pady=(0, 8))
-
-rb_random = ctk.CTkRadioButton(f_mode_row, text="🎲 Ngẫu Nhiên (random từ ngân hàng câu hỏi)",
-    variable=verify_mode_var, value="random",
-    font=("Segoe UI", 12), text_color="#00b4d8")
-rb_random.pack(side="top", anchor="w", pady=2)
-
-rb_specific = ctk.CTkRadioButton(f_mode_row, text="🎯 Tùy Chọn (chọn cụ thể câu hỏi bên dưới)",
-    variable=verify_mode_var, value="specific",
-    font=("Segoe UI", 12), text_color="#F1C40F")
-rb_specific.pack(side="top", anchor="w", pady=2)
-
-# Panel Random — hiển thị khi chọn random
-f_random_opts = ctk.CTkFrame(f_verify_section, fg_color="#162032", corner_radius=8)
-f_random_opts.pack(fill="x", padx=20, pady=(0, 6))
-ctk.CTkLabel(f_random_opts, text="Số câu hỏi sẽ hỏi (mặc định = 1):",
-    font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=12, pady=(8,2))
-entry_verify_question_count = ctk.CTkEntry(f_random_opts, width=420, placeholder_text="Ví dụ: 3")
-entry_verify_question_count.pack(padx=12, pady=(0, 10))
-
-# Panel Specific — hiển thị khi chọn specific
-f_specific_opts = ctk.CTkFrame(f_verify_section, fg_color="#1a1f0e", corner_radius=8)
-f_specific_opts.pack(fill="x", padx=20, pady=(0, 6))
-ctk.CTkLabel(f_specific_opts, text="Tích chọn các câu hỏi sẽ dùng khi xác minh:",
-    font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=12, pady=(8,2))
-
-# Checklist scrollable
-f_quiz_checklist = ctk.CTkScrollableFrame(f_specific_opts, fg_color="#111318", height=140)
-f_quiz_checklist.pack(fill="x", padx=12, pady=(0, 8))
-quiz_check_vars = {}   # {q_id: BooleanVar}
-quiz_check_widgets = []  # danh sách frame để xóa khi refresh
-
-ctk.CTkLabel(f_specific_opts,
-    text="💡 Tải danh sách câu hỏi: Chọn Server → nhấn 🔄 Tải Câu Hỏi bên dưới.",
-    font=("Segoe UI", 10), text_color="#888").pack(anchor="w", padx=12, pady=(0, 4))
-
-def refresh_verify_checklist():
-    """Tải danh sách câu hỏi từ DB vào checklist."""
-    global quiz_check_vars, quiz_check_widgets
-    for w in quiz_check_widgets:
-        try: w.destroy()
-        except: pass
-    quiz_check_widgets.clear()
-    quiz_check_vars.clear()
-
-    if not current_server_id:
-        lbl = ctk.CTkLabel(f_quiz_checklist, text="Chọn Server trước!", text_color="#DA373C")
-        lbl.pack()
-        quiz_check_widgets.append(lbl)
-        return
-
-    resp = _remote_request("DB_QUERY", {
-        "query": "SELECT id, question, correct_option FROM quiz_questions WHERE guild_id = ? ORDER BY id",
-        "params": [str(current_server_id)]
-    })
-
-    if not resp or not resp.get("ok") or not resp.get("data"):
-        lbl = ctk.CTkLabel(f_quiz_checklist,
-            text="Không có câu hỏi nào. Thêm câu hỏi tại tab ❓ CÂU HỎI.",
-            text_color="#888")
-        lbl.pack(pady=10)
-        quiz_check_widgets.append(lbl)
-        return
-
-    # Lấy danh sách ID đã chọn từ config để pre-tick
-    scf = cfg.get("servers", {}).get(current_server_id, {})
-    pinned = [str(i) for i in scf.get("verify_question_ids", [])]
-
-    for row in resp["data"]:
-        q_id = str(row["id"])
-        q_text = row["question"]
-        correct = row["correct_option"]
-
-        var = tk.BooleanVar(value=(q_id in pinned))
-        quiz_check_vars[q_id] = var
-
-        short = q_text[:65] + "..." if len(q_text) > 65 else q_text
-        cb = ctk.CTkCheckBox(
-            f_quiz_checklist,
-            text=f"[ID:{q_id}] {short}  ✔{correct}",
-            variable=var,
-            font=("Segoe UI", 11),
-            text_color="#ccc",
-            hover_color="#5865F2",
-            border_color="#5865F2"
-        )
-        cb.pack(anchor="w", padx=6, pady=2)
-        quiz_check_widgets.append(cb)
-
-def on_verify_mode_change(*_):
-    mode = verify_mode_var.get()
-    if mode == "random":
-        f_random_opts.pack(fill="x", padx=20, pady=(0, 6))
-        f_specific_opts.pack_forget()
-    else:
-        f_random_opts.pack_forget()
-        f_specific_opts.pack(fill="x", padx=20, pady=(0, 6))
-
-verify_mode_var.trace_add("write", on_verify_mode_change)
-
-# Nút tải checklist câu hỏi
-ctk.CTkButton(f_specific_opts, text="🔄 Tải Câu Hỏi", width=150,
-    fg_color="#2C2F33", hover_color="#3A3D42",
-    command=refresh_verify_checklist).pack(padx=12, pady=(0, 10))
-
-# Khởi tạo hiển thị ban đầu theo chế độ random
-on_verify_mode_change()
-
-ctk.CTkLabel(f_verify_section,
-    text="💡 Sau khi Lưu cấu hình, gõ lệnh  .setup_verify #kênh  trong Discord để tạo nút bấm xác minh.",
-    font=("Segoe UI", 10), text_color="#FEE75C", wraplength=460).pack(padx=20, pady=(0, 12))
-
 ms("MOD ROLES (Quyền Quản Trị):")
 f_mod_roles_container = ctk.CTkScrollableFrame(fs_spec, height=100, fg_color="#1E1F22")
 f_mod_roles_container.pack(fill="x", padx=20, pady=5)
@@ -1038,9 +884,7 @@ def on_server_select(choice):
         combo_log_channel.configure(values=c_names)
         combo_rr_channel.configure(values=c_names)
         combo_boost_channel.configure(values=c_names)
-        combo_verify_channel.configure(values=c_names)
         combo_auto_role.configure(values=r_names)
-        combo_pending_role.configure(values=["Không Bật Xác Minh"] + r_names[1:])
         combo_mod_add.configure(values=r_names)
         combo_rr_add.configure(values=r_names)
         combo_booster_role.configure(values=r_names)
@@ -1096,27 +940,7 @@ def on_server_select(choice):
         combo_booster_role.set(next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == booster_rid), "Không Yêu Cầu"))
         entry_boost_msg.delete(0, "end"); entry_boost_msg.insert(0, str(scf.get("boost_message", "")))
 
-        # Xác minh thành viên
-        pending_rid = str(scf.get("pending_role_id", ""))
-        combo_pending_role.set(next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == pending_rid), "Không Bật Xác Minh"))
-        verify_cid = str(scf.get("verify_channel_id", ""))
-        combo_verify_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == verify_cid), "Không Yêu Cầu"))
-        
-        q_count = scf.get("verify_question_count", 1)
-        entry_verify_question_count.delete(0, "end")
-        entry_verify_question_count.insert(0, str(q_count))
-        # Restore verify mode
-        pinned_ids = scf.get("verify_question_ids", [])
-        if pinned_ids:
-            verify_mode_var.set("specific")
-        else:
-            verify_mode_var.set("random")
-        on_verify_mode_change()
-        # Refresh checklist nếu có dữ liệu server
-        try:
-            refresh_verify_checklist()
-        except:
-            pass
+
 
         rr_cid = str(scf.get("rr_channel_id", ""))
         combo_rr_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == rr_cid), "Không Yêu Cầu"))
@@ -1128,10 +952,7 @@ def on_server_select(choice):
             r_name = next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == saved_id), None)
             if r_name: current_rr_roles.append({"id": saved_id, "name": r_name})
         refresh_rr_roles_ui()
-        try:
-            refresh_quiz_list()
-        except:
-            pass
+
 
     except Exception as e:
         import traceback
@@ -1381,183 +1202,7 @@ social_list_frame.pack(fill="x", padx=5, pady=(0,10))
 refresh_social_list()
 
 
-# ================= TAB CÂU HỎI (QUIZ) =================
-f_quiz_form = ctk.CTkFrame(sf_quiz, fg_color="#2B2D31", corner_radius=12)
-f_quiz_form.pack(pady=10, fill="x", padx=5)
-ctk.CTkLabel(f_quiz_form, text="📝 THÊM / SỬA CÂU HỎI TRẮC NGHIỆM", font=("Segoe UI", 15, "bold"), text_color="#5865F2").pack(pady=10)
 
-def mq_lbl(p, l):
-    ctk.CTkLabel(p, text=l, font=("Segoe UI", 11, "bold"), text_color="#B5BAC1").pack(anchor="w", padx=20)
-
-mq_lbl(f_quiz_form, "CÂU HỎI:")
-entry_quiz_question = ctk.CTkEntry(f_quiz_form, width=420, height=32, placeholder_text="Nhập nội dung câu hỏi...")
-entry_quiz_question.pack(pady=(2,8), padx=20)
-
-mq_lbl(f_quiz_form, "ĐÁP ÁN A:")
-entry_quiz_a = ctk.CTkEntry(f_quiz_form, width=420, height=30, placeholder_text="Đáp án A...")
-entry_quiz_a.pack(pady=(2,8), padx=20)
-
-mq_lbl(f_quiz_form, "ĐÁP ÁN B:")
-entry_quiz_b = ctk.CTkEntry(f_quiz_form, width=420, height=30, placeholder_text="Đáp án B...")
-entry_quiz_b.pack(pady=(2,8), padx=20)
-
-mq_lbl(f_quiz_form, "ĐÁP ÁN C:")
-entry_quiz_c = ctk.CTkEntry(f_quiz_form, width=420, height=30, placeholder_text="Đáp án C...")
-entry_quiz_c.pack(pady=(2,8), padx=20)
-
-mq_lbl(f_quiz_form, "ĐÁP ÁN D:")
-entry_quiz_d = ctk.CTkEntry(f_quiz_form, width=420, height=30, placeholder_text="Đáp án D...")
-entry_quiz_d.pack(pady=(2,8), padx=20)
-
-mq_lbl(f_quiz_form, "ĐÁP ÁN ĐÚNG:")
-combo_quiz_correct = ctk.CTkComboBox(f_quiz_form, values=["A", "B", "C", "D"], width=120, height=30)
-combo_quiz_correct.set("A")
-combo_quiz_correct.pack(pady=(2,8), padx=20, anchor="w")
-
-selected_quiz_id = None
-
-def refresh_quiz_list():
-    global selected_quiz_id
-    selected_quiz_id = None
-    
-    entry_quiz_question.delete(0, tk.END)
-    entry_quiz_a.delete(0, tk.END)
-    entry_quiz_b.delete(0, tk.END)
-    entry_quiz_c.delete(0, tk.END)
-    entry_quiz_d.delete(0, tk.END)
-    combo_quiz_correct.set("A")
-    
-    for w in quiz_list_frame.winfo_children():
-        w.destroy()
-        
-    if not current_server_id:
-        ctk.CTkLabel(quiz_list_frame, text="Vui lòng chọn Server ở mục QUẢN LÝ SERVER trước!", text_color="#DA373C", font=("Segoe UI", 12)).pack(pady=20)
-        return
-        
-    resp = _remote_request("DB_QUERY", {
-        "query": "SELECT id, question, option_a, option_b, option_c, option_d, correct_option FROM quiz_questions WHERE guild_id = ?",
-        "params": [str(current_server_id)]
-    })
-    
-    if not resp or not resp.get("ok"):
-        ctk.CTkLabel(quiz_list_frame, text="Không thể tải danh sách câu hỏi (Có thể chưa bật Bot).", text_color="#DA373C", font=("Segoe UI", 12)).pack(pady=20)
-        return
-        
-    rows = resp.get("data", [])
-    if not rows:
-        ctk.CTkLabel(quiz_list_frame, text="Chưa có câu hỏi nào. Hãy thêm ở trên!", text_color="#888", font=("Segoe UI", 12)).pack(pady=20)
-        return
-        
-    for row in rows:
-        q_id, q_text, opt_a, opt_b, opt_c, opt_d, correct_opt = row["id"], row["question"], row["option_a"], row["option_b"], row["option_c"], row["option_d"], row["correct_option"]
-        
-        row_frame = ctk.CTkFrame(quiz_list_frame, fg_color="#2B2D31", corner_radius=10)
-        row_frame.pack(fill="x", padx=5, pady=4)
-        
-        content_btn = ctk.CTkButton(row_frame, text=f"❓ {q_text[:50]}...", font=("Segoe UI", 12, "bold"), anchor="w", fg_color="transparent", hover_color="#3A3D42", text_color="#fff")
-        content_btn.pack(side="left", fill="both", expand=True, padx=10, pady=8)
-        
-        def make_populate(qid=q_id, qtext=q_text, oa=opt_a, ob=opt_b, oc=opt_c, od=opt_d, co=correct_opt):
-            def _populate():
-                global selected_quiz_id
-                selected_quiz_id = qid
-                entry_quiz_question.delete(0, tk.END)
-                entry_quiz_question.insert(0, qtext)
-                entry_quiz_a.delete(0, tk.END)
-                entry_quiz_a.insert(0, oa)
-                entry_quiz_b.delete(0, tk.END)
-                entry_quiz_b.insert(0, ob)
-                entry_quiz_c.delete(0, tk.END)
-                entry_quiz_c.insert(0, oc)
-                entry_quiz_d.delete(0, tk.END)
-                entry_quiz_d.insert(0, od)
-                combo_quiz_correct.set(co)
-            return _populate
-            
-        content_btn.configure(command=make_populate())
-        
-        def make_delete(qid=q_id):
-            def _del():
-                if messagebox.askyesno("Xác nhận", "Bạn có chắc muốn xóa câu hỏi này?"):
-                    try:
-                        _remote_request("DB_QUERY", {
-                            "query": "DELETE FROM quiz_questions WHERE id = ? AND guild_id = ?",
-                            "params": [qid, str(current_server_id)]
-                        })
-                        refresh_quiz_list()
-                        messagebox.showinfo("Thành công", "Đã xóa câu hỏi.")
-                    except Exception as e:
-                        messagebox.showerror("Lỗi", str(e))
-            return _del
-            
-        ctk.CTkButton(row_frame, text="❌ Xóa", width=70, height=30, fg_color="#DA373C", hover_color="#A12828", command=make_delete()).pack(side="right", padx=10)
-
-def btn_quiz_add_click():
-    if not current_server_id:
-        return messagebox.showwarning("Cảnh báo", "Vui lòng chọn Server trước!")
-        
-    q_text = entry_quiz_question.get().strip()
-    opt_a = entry_quiz_a.get().strip()
-    opt_b = entry_quiz_b.get().strip()
-    opt_c = entry_quiz_c.get().strip()
-    opt_d = entry_quiz_d.get().strip()
-    correct = combo_quiz_correct.get()
-    
-    if not q_text or not opt_a or not opt_b or not opt_c or not opt_d:
-        return messagebox.showwarning("Thiếu dữ liệu", "Vui lòng điền đầy đủ câu hỏi và 4 đáp án!")
-        
-    try:
-        _remote_request("DB_QUERY", {
-            "query": "INSERT INTO quiz_questions (guild_id, question, option_a, option_b, option_c, option_d, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            "params": [str(current_server_id), q_text, opt_a, opt_b, opt_c, opt_d, correct]
-        })
-        refresh_quiz_list()
-        messagebox.showinfo("Thành công", "Đã thêm câu hỏi thành công!")
-    except Exception as e:
-        messagebox.showerror("Lỗi", str(e))
-
-def btn_quiz_update_click():
-    global selected_quiz_id
-    if not current_server_id:
-        return messagebox.showwarning("Cảnh báo", "Vui lòng chọn Server trước!")
-    if not selected_quiz_id:
-        return messagebox.showwarning("Cảnh báo", "Vui lòng chọn câu hỏi trong danh sách bên dưới để sửa!")
-        
-    q_text = entry_quiz_question.get().strip()
-    opt_a = entry_quiz_a.get().strip()
-    opt_b = entry_quiz_b.get().strip()
-    opt_c = entry_quiz_c.get().strip()
-    opt_d = entry_quiz_d.get().strip()
-    correct = combo_quiz_correct.get()
-    
-    if not q_text or not opt_a or not opt_b or not opt_c or not opt_d:
-        return messagebox.showwarning("Thiếu dữ liệu", "Vui lòng điền đầy đủ câu hỏi và 4 đáp án!")
-        
-    try:
-        _remote_request("DB_QUERY", {
-            "query": "UPDATE quiz_questions SET question=?, option_a=?, option_b=?, option_c=?, option_d=?, correct_option=? WHERE id=? AND guild_id=?",
-            "params": [q_text, opt_a, opt_b, opt_c, opt_d, correct, selected_quiz_id, str(current_server_id)]
-        })
-        refresh_quiz_list()
-        messagebox.showinfo("Thành công", "Đã cập nhật câu hỏi thành công!")
-    except Exception as e:
-        messagebox.showerror("Lỗi", str(e))
-
-btn_quiz_row = ctk.CTkFrame(f_quiz_form, fg_color="transparent")
-btn_quiz_row.pack(pady=10, padx=20, fill="x")
-ctk.CTkButton(btn_quiz_row, text="➕ Thêm", width=120, fg_color="#23A559", hover_color="#1A7A41", command=btn_quiz_add_click).pack(side="left", padx=5)
-ctk.CTkButton(btn_quiz_row, text="💾 Cập nhật", width=120, fg_color="#5865F2", hover_color="#4752C4", command=btn_quiz_update_click).pack(side="left", padx=5)
-ctk.CTkButton(btn_quiz_row, text="🔄 Làm mới", width=120, fg_color="#2C2F33", hover_color="#3A3D42", command=refresh_quiz_list).pack(side="left", padx=5)
-
-f_quiz_list_header = ctk.CTkFrame(sf_quiz, fg_color="#2B2D31", corner_radius=12)
-f_quiz_list_header.pack(pady=(10,0), fill="x", padx=5)
-ctk.CTkLabel(f_quiz_list_header, text="📋 DANH SÁCH CÂU HỎI TRÊN SERVER", font=("Segoe UI", 13, "bold"), text_color="#00b4d8").pack(side="left", padx=15, pady=8)
-
-quiz_list_frame = ctk.CTkScrollableFrame(sf_quiz, fg_color="transparent", height=300)
-quiz_list_frame.pack(fill="x", padx=5, pady=(0,10))
-
-# Load initial list
-refresh_quiz_list()
 
 def check_status_loop():
     try:
