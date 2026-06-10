@@ -777,3 +777,310 @@ textarea.form-control {
         border-bottom: 1px solid var(--card-border);
     }
 }
+
+/* ================================================================
+   QA & SECURITY TAB STYLES (Đề cao cho Nghĩa - Issue #31)
+   Tích hợp fix từ Long (#33 DevOps) & Viet (#34 QA/Security)
+   ================================================================ */
+
+/* Nav Badge for QA tab */
+.nav-badge {
+    margin-left: auto;
+    background: linear-gradient(135deg, #23A55A, #00B0F4);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* QA Stats Grid — slightly smaller values */
+.qa-stats-grid {
+    margin-bottom: 24px;
+}
+
+.value-sm {
+    font-size: 18px !important;
+    font-weight: 700;
+    word-break: break-word;
+}
+
+/* Security Checklist */
+.security-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.checklist-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.checklist-placeholder i {
+    width: 36px;
+    height: 36px;
+    opacity: 0.3;
+}
+
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--border-radius-sm);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--card-border);
+    font-size: 13px;
+    animation: fadeIn 0.3s ease-out both;
+    transition: background 0.2s;
+}
+
+.checklist-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.checklist-item.pass {
+    border-color: rgba(35, 165, 90, 0.25);
+}
+
+.checklist-item.fail {
+    border-color: rgba(242, 63, 67, 0.25);
+}
+
+.checklist-item.warn {
+    border-color: rgba(240, 178, 50, 0.25);
+}
+
+.checklist-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.checklist-icon.pass {
+    background: var(--success-bg);
+    color: #57F287;
+}
+
+.checklist-icon.fail {
+    background: var(--danger-bg);
+    color: #FF7376;
+}
+
+.checklist-icon.warn {
+    background: var(--warning-bg);
+    color: #F0B232;
+}
+
+.checklist-label {
+    flex-grow: 1;
+    color: var(--text-main);
+}
+
+.checklist-result {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.checklist-result.pass {
+    background: var(--success-bg);
+    color: #57F287;
+}
+
+.checklist-result.fail {
+    background: var(--danger-bg);
+    color: #FF7376;
+}
+
+.checklist-result.warn {
+    background: var(--warning-bg);
+    color: #F0B232;
+}
+
+/* Health Monitor */
+.health-monitor {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.health-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: fadeIn 0.4s ease-out both;
+}
+
+.health-metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.health-metric-label {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.health-metric-value {
+    color: var(--text-highlight);
+    font-weight: 600;
+}
+
+.health-metric-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.health-metric-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.health-metric-fill.green { background: linear-gradient(90deg, #23A55A, #57F287); }
+.health-metric-fill.blue  { background: linear-gradient(90deg, #00B0F4, #60c8ff); }
+.health-metric-fill.purple{ background: linear-gradient(90deg, #8A2BE2, #c792ea); }
+.health-metric-fill.amber { background: linear-gradient(90deg, #F0B232, #FFD580); }
+
+/* API Endpoint Docs */
+.api-docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+.api-endpoint-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-md);
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.api-endpoint-card:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.endpoint-method {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.endpoint-method.get {
+    background: rgba(35, 165, 90, 0.2);
+    color: #57F287;
+    border: 1px solid rgba(35, 165, 90, 0.3);
+}
+
+.endpoint-method.post {
+    background: rgba(0, 176, 244, 0.2);
+    color: #00B0F4;
+    border: 1px solid rgba(0, 176, 244, 0.3);
+}
+
+.endpoint-info {
+    flex-grow: 1;
+}
+
+.endpoint-info code {
+    display: block;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    color: #A9B2C3;
+    margin-bottom: 2px;
+}
+
+.endpoint-info p {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.endpoint-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.endpoint-badge.public {
+    background: rgba(35, 165, 90, 0.15);
+    color: #57F287;
+    border: 1px solid rgba(35, 165, 90, 0.2);
+}
+
+.endpoint-badge.auth {
+    background: rgba(0, 176, 244, 0.15);
+    color: #00B0F4;
+    border: 1px solid rgba(0, 176, 244, 0.2);
+}
+
+.endpoint-badge.owner {
+    background: rgba(240, 178, 50, 0.15);
+    color: #F0B232;
+    border: 1px solid rgba(240, 178, 50, 0.2);
+}
+
+/* Badge info variant */
+.badge-info {
+    background: rgba(0, 176, 244, 0.1);
+    border-color: rgba(0, 176, 244, 0.2);
+    color: #00B0F4;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Audit running animation */
+@keyframes auditPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.auditing {
+    animation: auditPulse 1s ease-in-out infinite;
+}
+
+/* Form actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid var(--card-border);
+}
