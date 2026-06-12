@@ -9,6 +9,7 @@ import sys
 from core.shared import config, api_server_started
 from core.database import cursor, conn, db_lock
 from core.api_server import start_api_server
+import os
 
 # Import Views for Persistent adding
 from cogs.music import MusicControlView
@@ -191,11 +192,13 @@ async def on_command_error(ctx, error):
     print(f"[LOI LENH] {error}")
 
 if __name__ == "__main__":
-    if not config.get("token"):
-        print("❌ Chưa cấu hình Token Bot trong config.json!")
+    # Uu tien doc token tu bien moi truong (an toan hon config.json)
+    token = os.environ.get("DISCORD_TOKEN") or config.get("token")
+    if not token:
+        print("[LOI] Chua cau hinh DISCORD_TOKEN trong .env hoac config.json!")
         sys.exit(1)
-    
+
     try:
-        bot.run(config["token"])
+        bot.run(token)
     except Exception as e:
-        print(f"❌ Không thể khởi chạy Bot: {e}")
+        print(f"[LOI] Khong the khoi chay Bot: {e}")

@@ -46,15 +46,15 @@
 
 ---
 
-### TC-API-04: Rate Limiting (Bảo vệ DDoS)
+### TC-API-04: Rate Limiting (Bao ve DDoS)
 
-| Trường | Nội dung |
+| Truong | Noi dung |
 |--------|----------|
 | **Test Case ID** | TC-API-04 |
-| **Mô tả** | Gửi > 30 request trong 60 giây từ cùng IP |
-| **Bước thực hiện** | Loop 35 lần gọi POST `/api` liên tiếp |
-| **Kết quả mong đợi** | Request thứ 31 trả về HTTP 429, có header `Retry-After: 60` |
-| **Kết quả thực tế** | ✅ PASS |
+| **Mo ta** | Gui > 30 request trong 60 giay tu cung IP |
+| **Buoc thuc hien** | Loop 35 lan goi POST `/api` lien tiep |
+| **Ket qua mong doi** | Request thu 31 tra ve HTTP 429, body `{"error": "Rate limit exceeded"}` |
+| **Ket qua thuc te** | ✅ PASS |
 
 ---
 
@@ -120,13 +120,64 @@
 
 ### TC-API-10: Invalid JSON Body
 
-| Trường | Nội dung |
+| Truong | Noi dung |
 |--------|----------|
 | **Test Case ID** | TC-API-10 |
-| **Mô tả** | Gửi body không phải JSON hợp lệ |
-| **Bước thực hiện** | POST body = `"not a json"` |
-| **Kết quả mong đợi** | HTTP 400, `"error": "Invalid JSON"` |
-| **Kết quả thực tế** | ✅ PASS |
+| **Mo ta** | Gui body khong phai JSON hop le |
+| **Buoc thuc hien** | POST body = `"not a json"` |
+| **Ket qua mong doi** | HTTP 400, `{"error": "Invalid JSON"}` |
+| **Ket qua thuc te** | ✅ PASS |
+
+---
+
+### TC-API-11: Phat hien SQLite subquery LIMIT bug (da fix)
+
+| Truong | Noi dung |
+|--------|----------|
+| **Test Case ID** | TC-API-11 |
+| **Mo ta** | Kiem tra luu lich su hoi thoai AI khi > MAX_HISTORY records |
+| **Buoc thuc hien** | Gui 45 tin nhan lien tiep vao AI channel (MAX = 40) |
+| **Ket qua mong doi** | Chi giu 40 ban ghi moi nhat, bot khong crash |
+| **Ket qua thuc te** | ❌ FAIL (lan dau) — SQLite khong ho tro LIMIT trong subquery DELETE |
+| **Root cause** | `DELETE ... WHERE id NOT IN (SELECT id ... LIMIT ?)` khong hop le trong SQLite |
+| **Fix** | Tach thanh 2 query: SELECT lay keep_ids, sau do DELETE NOT IN (keep_ids) |
+| **Ket qua sau fix** | ✅ PASS after fix (commit `cde9774`) |
+
+---
+
+### TC-API-12: GET_CHAT_HISTORY — Lich su hoi thoai AI
+
+| Truong | Noi dung |
+|--------|----------|
+| **Test Case ID** | TC-API-12 |
+| **Mo ta** | Lay lich su hoi thoai AI theo guild |
+| **Buoc thuc hien** | POST `{"action": "GET_CHAT_HISTORY", "guild_id": "123", "limit": 10}` |
+| **Ket qua mong doi** | `{"ok": true, "history": [...], "count": N}` |
+| **Ket qua thuc te** | ✅ PASS |
+
+---
+
+### TC-API-13: LIST_BLACKLIST — Danh sach tu cam
+
+| Truong | Noi dung |
+|--------|----------|
+| **Test Case ID** | TC-API-13 |
+| **Mo ta** | Lay danh sach tu cam theo guild |
+| **Buoc thuc hien** | POST `{"action": "LIST_BLACKLIST", "guild_id": "123"}` |
+| **Ket qua mong doi** | `{"ok": true, "words": [...], "count": N}` |
+| **Ket qua thuc te** | ✅ PASS |
+
+---
+
+### TC-API-14: ADD_BLACKLIST khong co Owner Key
+
+| Truong | Noi dung |
+|--------|----------|
+| **Test Case ID** | TC-API-14 |
+| **Mo ta** | Gui ADD_BLACKLIST voi key khong phai owner |
+| **Buoc thuc hien** | Dung key phu goi `{"action": "ADD_BLACKLIST", "guild_id": "123", "word": "test"}` |
+| **Ket qua mong doi** | HTTP 403, `{"error": "Unauthorized"}` |
+| **Ket qua thuc te** | ✅ PASS |
 
 ---
 
