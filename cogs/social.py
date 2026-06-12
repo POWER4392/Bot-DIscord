@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 import re
 import requests
 import xml.etree.ElementTree as ET
-from core.shared import config, PLATFORM_EMOJI
+from core.shared import config, PLATFORM_EMOJI, is_mod
 from core.database import cursor, conn, db_lock
 import json
 
@@ -13,19 +13,6 @@ class DoiLinkView(discord.ui.View):
         emoji = PLATFORM_EMOJI.get(platform, "🔗")
         self.add_item(discord.ui.Button(label=f"Xem trực tiếp trên {platform.capitalize()}", url=link, emoji=emoji))
 
-def is_mod():
-    async def predicate(ctx):
-        if ctx.author.guild_permissions.administrator: return True
-        guild_id = str(ctx.guild.id)
-        server_cfg = config.get("servers", {}).get(guild_id, config)
-        mod_role_ids = server_cfg.get("mod_role_ids", [])
-        old_mod = server_cfg.get("mod_role_id")
-        if old_mod and str(old_mod) not in [str(x) for x in mod_role_ids]:
-            mod_role_ids = list(mod_role_ids) + [old_mod]
-        if not mod_role_ids: return False
-        user_role_ids = [r.id for r in ctx.author.roles]
-        return any(int(m) in user_role_ids for m in mod_role_ids)
-    return commands.check(predicate)
 
 
 class Social(commands.Cog):
@@ -175,12 +162,17 @@ class Social(commands.Cog):
         if platform == "youtube":
             if "youtube.com" in target or "youtu.be" in target:
                 m = re.search(r'youtube\.com/channel/(UC[\w-]+)', target)
-                if m: target_id = m.group(1)
+                if m:
+                    target_id = m.group(1)
                 else:
-                    resp = requests.get(target, timeout=10)
+                    def _fetch_yt_page():
+                        return requests.get(target, timeout=10)
+                    resp = await self.bot.loop.run_in_executor(None, _fetch_yt_page)
                     m2 = re.search(r'channel_id=([\w-]+)', resp.text)
-                    if m2: target_id = m2.group(1)
-                    else: return await ctx.send("❌ Thất bại: Không thu thập được Channel ID ẩn của liên kết YouTube này.")
+                    if m2:
+                        target_id = m2.group(1)
+                    else:
+                        return await ctx.send("❌ Thất bại: Không thu thập được Channel ID ẩn của liên kết YouTube này.")
         elif platform == "reddit":
             if "reddit.com/r/" in target:
                 target_id = target.split("reddit.com/r/")[1].split("/")[0]

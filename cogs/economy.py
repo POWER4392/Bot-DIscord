@@ -77,12 +77,15 @@ class Economy(commands.Cog):
         async with ctx.typing():
             bg = Image.new("RGBA", (800, 250), (43, 45, 49, 255))
             try:
-                response = requests.get(member.display_avatar.url)
-                avatar = Image.open(BytesIO(response.content)).convert("RGBA").resize((180, 180))
+                def _fetch_avatar():
+                    return requests.get(member.display_avatar.url, timeout=10)
+                avatar_resp = await self.bot.loop.run_in_executor(None, _fetch_avatar)
+                avatar = Image.open(BytesIO(avatar_resp.content)).convert("RGBA").resize((180, 180))
                 mask = Image.new("L", (180, 180), 0)
                 ImageDraw.Draw(mask).ellipse((0, 0, 180, 180), fill=255)
                 bg.paste(avatar, (35, 35), mask)
-            except: pass
+            except Exception as e:
+                print(f"[Rank] Loi tai avatar: {e}")
             
             draw = ImageDraw.Draw(bg)
             try: 

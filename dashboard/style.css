@@ -1084,3 +1084,50 @@ textarea.form-control {
     padding-top: 8px;
     border-top: 1px solid var(--card-border);
 }
+
+/* ================================================================
+   AUTHOR CREDIT — Issue #31: Tống Xuân Nghĩa (@hendrix810)
+   UI/UX Web Dashboard
+   ================================================================ */
+.author-credit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(88, 101, 242, 0.07);
+    border: 1px solid rgba(88, 101, 242, 0.18);
+    border-radius: var(--border-radius-md);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.author-credit i {
+    width: 14px;
+    height: 14px;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.author-credit a {
+    color: #7289DA;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.author-credit a:hover {
+    color: #A0B5FF;
+    text-decoration: underline;
+}
+
+.issue-tag {
+    margin-left: auto;
+    background: linear-gradient(135deg, #5865F2, #8A2BE2);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}

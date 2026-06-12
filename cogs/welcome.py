@@ -5,23 +5,8 @@ import datetime
 import json
 import random
 import string
-from core.shared import config, config_file
+from core.shared import config, config_file, is_mod
 from core.database import cursor, conn, db_lock
-
-
-def is_mod():
-    async def predicate(ctx):
-        if ctx.author.guild_permissions.administrator: return True
-        guild_id = str(ctx.guild.id)
-        server_cfg = config.get("servers", {}).get(guild_id, config)
-        mod_role_ids = server_cfg.get("mod_role_ids", [])
-        old_mod = server_cfg.get("mod_role_id")
-        if old_mod and str(old_mod) not in [str(x) for x in mod_role_ids]:
-            mod_role_ids = list(mod_role_ids) + [old_mod]
-        if not mod_role_ids: return False
-        user_role_ids = [r.id for r in ctx.author.roles]
-        return any(int(m) in user_role_ids for m in mod_role_ids)
-    return commands.check(predicate)
 
 
 # ─────────────────────────────────────────────

@@ -6,22 +6,8 @@ import datetime
 import time
 import asyncio
 import re
-from core.shared import config, anti_nuke_tracker, spam_tracker, SCAM_REGEX_GLOBAL
+from core.shared import config, anti_nuke_tracker, spam_tracker, SCAM_REGEX_GLOBAL, is_mod
 from core.database import cursor, conn, db_lock
-
-def is_mod():
-    async def predicate(ctx):
-        if ctx.author.guild_permissions.administrator: return True
-        guild_id = str(ctx.guild.id)
-        server_cfg = config.get("servers", {}).get(guild_id, config)
-        mod_role_ids = server_cfg.get("mod_role_ids", [])
-        old_mod = server_cfg.get("mod_role_id")
-        if old_mod and str(old_mod) not in [str(x) for x in mod_role_ids]:
-            mod_role_ids = list(mod_role_ids) + [old_mod]
-        if not mod_role_ids: return False
-        user_role_ids = [r.id for r in ctx.author.roles]
-        return any(int(m) in user_role_ids for m in mod_role_ids)
-    return commands.check(predicate)
 
 class Moderation(commands.Cog):
     def __init__(self, bot):
@@ -224,46 +210,57 @@ class Moderation(commands.Cog):
     @is_mod()
     async def warn_user(self, ctx, member: discord.Member, *, reason: str = "Không có lý do"):
         guild_id, user_id = str(ctx.guild.id), str(member.id)
-        with db_lock:
-            cursor.execute("SELECT warn_count FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
-            row = cursor.fetchone()
-            warn_count = row[0] + 1 if row else 1
-            cursor.execute("INSERT OR REPLACE INTO warnings (guild_id, user_id, warn_count) VALUES (?, ?, ?)", (guild_id, user_id, warn_count))
-            conn.commit()
-        
+
+        def _do_warn():
+            with db_lock:
+                cursor.execute("SELECT warn_count FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+                row = cursor.fetchone()
+                wc = row[0] + 1 if row else 1
+                cursor.execute("INSERT OR REPLACE INTO warnings (guild_id, user_id, warn_count) VALUES (?, ?, ?)", (guild_id, user_id, wc))
+                conn.commit()
+                return wc
+
+        warn_count = await self.bot.loop.run_in_executor(None, _do_warn)
         await ctx.send(f"⚠️ **{member.name}** đã bị cảnh cáo lần {warn_count}! Lý do: {reason}")
-        
+
         if warn_count == 3:
             try:
-                duration = datetime.timedelta(minutes=10)
-                await member.timeout(duration, reason="Phạt cảnh cáo 3 lần")
+                await member.timeout(datetime.timedelta(minutes=10), reason="Phạt cảnh cáo 3 lần")
                 await ctx.send(f"🔇 **{member.name}** đã bị tự động Timeout 10 phút do nhận 3 cảnh cáo!")
-            except: pass
+            except Exception as e:
+                print(f"[Warn] Loi timeout: {e}")
         elif warn_count >= 5:
             try:
                 await member.kick(reason="Phạt cảnh cáo 5 lần")
                 await ctx.send(f"🔨 **{member.name}** đã bị tự động Kick khỏi server do nhận 5 cảnh cáo!")
-                with db_lock:
-                    cursor.execute("DELETE FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
-                    conn.commit()
-            except: pass
+                def _del_warns():
+                    with db_lock:
+                        cursor.execute("DELETE FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+                        conn.commit()
+                await self.bot.loop.run_in_executor(None, _del_warns)
+            except Exception as e:
+                print(f"[Warn] Loi kick: {e}")
 
     @commands.hybrid_command(name="unwarn", description="Xoá toàn bộ cảnh cáo của một thành viên.")
     @is_mod()
     async def unwarn_user(self, ctx, member: discord.Member):
         guild_id, user_id = str(ctx.guild.id), str(member.id)
-        with db_lock:
-            cursor.execute("DELETE FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
-            conn.commit()
-        await ctx.send(f"✅ Đã xoá sạch toàn bộ cảnh cáo của **{member.name}**. Tờ giấy trắng tinh!") 
+        def _del():
+            with db_lock:
+                cursor.execute("DELETE FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+                conn.commit()
+        await self.bot.loop.run_in_executor(None, _del)
+        await ctx.send(f"✅ Đã xoá sạch toàn bộ cảnh cáo của **{member.name}**. Tờ giấy trắng tinh!")
 
     @commands.hybrid_command(name="warns", description="Xem số lượng cảnh cáo của một thành viên.")
     @is_mod()
     async def warns_user(self, ctx, member: discord.Member):
         guild_id, user_id = str(ctx.guild.id), str(member.id)
-        with db_lock:
-            cursor.execute("SELECT warn_count FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
-            row = cursor.fetchone()
+        def _get():
+            with db_lock:
+                cursor.execute("SELECT warn_count FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+                return cursor.fetchone()
+        row = await self.bot.loop.run_in_executor(None, _get)
         count = row[0] if row else 0
         if count == 0:
             status_msg = "✅ Thành viên này chưa có cảnh cáo nào."
@@ -287,10 +284,14 @@ class Moderation(commands.Cog):
         try:
             await member.add_roles(role)
             expires_at = datetime.datetime.now().timestamp() + (hours * 3600)
-            with db_lock:
-                cursor.execute("INSERT OR REPLACE INTO timed_roles (guild_id, user_id, role_id, expires_at) VALUES (?, ?, ?, ?)", 
-                               (str(ctx.guild.id), str(member.id), str(role.id), expires_at))
-                conn.commit()
+            def _insert():
+                with db_lock:
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO timed_roles (guild_id, user_id, role_id, expires_at) VALUES (?, ?, ?, ?)",
+                        (str(ctx.guild.id), str(member.id), str(role.id), expires_at)
+                    )
+                    conn.commit()
+            await self.bot.loop.run_in_executor(None, _insert)
             await ctx.send(f"⏳ Đã cấp quyền **{role.name}** cho **{member.name}** trong {hours} giờ.")
         except Exception as e:
             await ctx.send(f"❌ Thuật toán thất bại. Bot không có quyền cấp Role này: {e}")

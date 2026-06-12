@@ -1,6 +1,10 @@
 # SLIDE THUYẾT TRÌNH DỰ ÁN DISCORD BOT QUẢN LÝ SERVER TÍCH HỢP AI
 ## Môn học: Công Nghệ Phần Mềm | Nhóm: 5 Thành Viên
 
+> **Tác giả biên soạn:** Tống Xuân Nghĩa — GitHub: [@hendrix810](https://github.com/hendrix810)  
+> **Issue liên kết:** #31 — `[UI/UX]` Thiết kế Web Dashboard & Biên soạn Demo  
+> **Cập nhật lần cuối:** 2026-06-10
+
 ---
 
 ### [SLIDE 1] TIÊU ĐỀ & GIỚI THIỆU NHÓM

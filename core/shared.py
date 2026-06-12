@@ -54,4 +54,24 @@ FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconne
 PLATFORM_EMOJI = {"youtube": "▶️", "reddit": "🟧", "tiktok": "🎵", "facebook": "🔵"}
 
 import re
+from discord.ext import commands
+
 SCAM_REGEX_GLOBAL = re.compile(r"(discord\.gift\/|steamcommun.*\.com|discorcl\.gift|discordapp\.click|free-nitro|robux-free)", re.IGNORECASE)
+
+
+def is_mod():
+    """Check decorator dùng chung cho tất cả Cog: cho phép Admin hoặc người có Mod role."""
+    async def predicate(ctx):
+        if ctx.author.guild_permissions.administrator:
+            return True
+        guild_id = str(ctx.guild.id)
+        server_cfg = config.get("servers", {}).get(guild_id, config)
+        mod_role_ids = list(server_cfg.get("mod_role_ids", []))
+        old_mod = server_cfg.get("mod_role_id")
+        if old_mod and str(old_mod) not in [str(x) for x in mod_role_ids]:
+            mod_role_ids.append(old_mod)
+        if not mod_role_ids:
+            return False
+        user_role_ids = [r.id for r in ctx.author.roles]
+        return any(int(m) in user_role_ids for m in mod_role_ids)
+    return commands.check(predicate)

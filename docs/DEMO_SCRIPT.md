@@ -1,9 +1,14 @@
 # KỊCH BẢN CHẠY DEMO DỰ ÁN DISCORD BOT & WEB DASHBOARD
 ## Dành cho Buổi Báo cáo Môn học Công Nghệ Phần Mềm
 
+> **Tác giả biên soạn:** Tống Xuân Nghĩa — GitHub: [@hendrix810](https://github.com/hendrix810)  
+> **Issue liên kết:** #31 — `[UI/UX]` Thiết kế Web Dashboard & Biên soạn Demo  
+> **Cập nhật lần cuối:** 2026-06-10
+
 Tài liệu này hướng dẫn chi tiết từng bước chuẩn bị và các kịch bản trình diễn thực tế trong buổi báo cáo dự án.
 
 ---
+
 
 ## 1. Giai đoạn chuẩn bị (Setup & Verification)
 * **Bước 1:** Khởi động bot ở môi trường local hoặc cloud.

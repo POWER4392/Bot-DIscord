@@ -66,15 +66,22 @@ class AIChatbot(commands.Cog):
                     (str(guild_id), str(user_id), role, content, time.time())
                 )
                 conn.commit()
-                # Giữ chỉ MAX_HISTORY_PER_USER bản ghi mới nhất
+                # Giữ chỉ MAX_HISTORY_PER_USER*2 bản ghi mới nhất
+                # SQLite không hỗ trợ LIMIT trong subquery của DELETE → dùng 2 bước
                 cursor.execute(
-                    """DELETE FROM ai_conversations WHERE guild_id=? AND user_id=? AND id NOT IN (
-                        SELECT id FROM ai_conversations WHERE guild_id=? AND user_id=?
-                        ORDER BY timestamp DESC LIMIT ?
-                    )""",
-                    (str(guild_id), str(user_id), str(guild_id), str(user_id), MAX_HISTORY_PER_USER * 2)
+                    "SELECT id FROM ai_conversations WHERE guild_id=? AND user_id=? "
+                    "ORDER BY timestamp DESC LIMIT ?",
+                    (str(guild_id), str(user_id), MAX_HISTORY_PER_USER * 2)
                 )
-                conn.commit()
+                keep_ids = [row[0] for row in cursor.fetchall()]
+                if keep_ids:
+                    placeholders = ",".join("?" * len(keep_ids))
+                    cursor.execute(
+                        f"DELETE FROM ai_conversations WHERE guild_id=? AND user_id=? "
+                        f"AND id NOT IN ({placeholders})",
+                        [str(guild_id), str(user_id)] + keep_ids
+                    )
+                    conn.commit()
         except Exception as e:
             print(f"[AI DB] Loi luu lich su: {e}")
 

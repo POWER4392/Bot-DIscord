@@ -130,6 +130,9 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS ai_conversations (
                     content TEXT,
                     timestamp REAL
                 )''')
+# Index để tăng tốc query lịch sử theo user (tránh full-table scan)
+cursor.execute('''CREATE INDEX IF NOT EXISTS idx_ai_conv_user
+                  ON ai_conversations (guild_id, user_id, timestamp DESC)''')
 conn.commit()
 
 def db_get_user(guild_id, user_id):
