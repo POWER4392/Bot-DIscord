@@ -46,15 +46,15 @@
 
 ---
 
-### TC-API-04: Rate Limiting (Bao ve DDoS)
+### TC-API-04: Rate Limiting (Bảo vệ DDoS)
 
-| Truong | Noi dung |
+| Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-API-04 |
-| **Mo ta** | Gui > 30 request trong 60 giay tu cung IP |
-| **Buoc thuc hien** | Loop 35 lan goi POST `/api` lien tiep |
-| **Ket qua mong doi** | Request thu 31 tra ve HTTP 429, body `{"error": "Rate limit exceeded"}` |
-| **Ket qua thuc te** | ✅ PASS |
+| **Mô tả** | Gửi > 30 request trong 60 giây từ cùng IP |
+| **Bước thực hiện** | Loop 35 lần gọi POST `/api` liên tiếp |
+| **Kết quả mong đợi** | Request thứ 31 trả về HTTP 429, body `{"error": "Rate limit exceeded"}` |
+| **Kết quả thực tế** | ✅ PASS |
 
 ---
 
@@ -120,64 +120,64 @@
 
 ### TC-API-10: Invalid JSON Body
 
-| Truong | Noi dung |
+| Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-API-10 |
-| **Mo ta** | Gui body khong phai JSON hop le |
-| **Buoc thuc hien** | POST body = `"not a json"` |
-| **Ket qua mong doi** | HTTP 400, `{"error": "Invalid JSON"}` |
-| **Ket qua thuc te** | ✅ PASS |
+| **Mô tả** | Gửi body không phải JSON hợp lệ |
+| **Bước thực hiện** | POST body = `"not a json"` |
+| **Kết quả mong đợi** | HTTP 400, `{"error": "Invalid JSON"}` |
+| **Kết quả thực tế** | ✅ PASS |
 
 ---
 
-### TC-API-11: Phat hien SQLite subquery LIMIT bug (da fix)
+### TC-API-11: Phát hiện lỗi SQLite subquery LIMIT (Tìm thấy và đã fix)
 
-| Truong | Noi dung |
+| Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-API-11 |
-| **Mo ta** | Kiem tra luu lich su hoi thoai AI khi > MAX_HISTORY records |
-| **Buoc thuc hien** | Gui 45 tin nhan lien tiep vao AI channel (MAX = 40) |
-| **Ket qua mong doi** | Chi giu 40 ban ghi moi nhat, bot khong crash |
-| **Ket qua thuc te** | ❌ FAIL (lan dau) — SQLite khong ho tro LIMIT trong subquery DELETE |
-| **Root cause** | `DELETE ... WHERE id NOT IN (SELECT id ... LIMIT ?)` khong hop le trong SQLite |
-| **Fix** | Tach thanh 2 query: SELECT lay keep_ids, sau do DELETE NOT IN (keep_ids) |
-| **Ket qua sau fix** | ✅ PASS after fix (commit `cde9774`) |
+| **Mô tả** | Kiểm tra lưu lịch sử hội thoại AI khi > MAX_HISTORY records |
+| **Bước thực hiện** | Gửi 45 tin nhắn liên tiếp vào AI channel (MAX = 40) |
+| **Kết quả mong đợi** | Chỉ giữ 40 bản ghi mới nhất, bot không crash |
+| **Kết quả thực tế** | ❌ FAIL (lần đầu) — SQLite không hỗ trợ LIMIT trong subquery DELETE |
+| **Root cause** | `DELETE ... WHERE id NOT IN (SELECT id ... LIMIT ?)` không hợp lệ trong SQLite |
+| **Fix** | Tách thành 2 query: SELECT lấy keep_ids, sau đó DELETE NOT IN (keep_ids) |
+| **Kết quả sau fix** | ✅ PASS after fix (commit `cde9774`) |
 
 ---
 
-### TC-API-12: GET_CHAT_HISTORY — Lich su hoi thoai AI
+### TC-API-12: GET_CHAT_HISTORY — Lịch sử hội thoại AI
 
-| Truong | Noi dung |
+| Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-API-12 |
-| **Mo ta** | Lay lich su hoi thoai AI theo guild |
-| **Buoc thuc hien** | POST `{"action": "GET_CHAT_HISTORY", "guild_id": "123", "limit": 10}` |
-| **Ket qua mong doi** | `{"ok": true, "history": [...], "count": N}` |
-| **Ket qua thuc te** | ✅ PASS |
+| **Mô tả** | Lấy lịch sử hội thoại AI theo guild |
+| **Bước thực hiện** | POST `{"action": "GET_CHAT_HISTORY", "guild_id": "123", "limit": 10}` |
+| **Kết quả mong đợi** | `{"ok": true, "history": [...], "count": N}` |
+| **Kết quả thực tế** | ✅ PASS |
 
 ---
 
-### TC-API-13: LIST_BLACKLIST — Danh sach tu cam
+### TC-API-13: LIST_BLACKLIST — Danh sách từ cấm
 
-| Truong | Noi dung |
+| Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-API-13 |
-| **Mo ta** | Lay danh sach tu cam theo guild |
-| **Buoc thuc hien** | POST `{"action": "LIST_BLACKLIST", "guild_id": "123"}` |
-| **Ket qua mong doi** | `{"ok": true, "words": [...], "count": N}` |
-| **Ket qua thuc te** | ✅ PASS |
+| **Mô tả** | Lấy danh sách từ cấm theo guild |
+| **Bước thực hiện** | POST `{"action": "LIST_BLACKLIST", "guild_id": "123"}` |
+| **Kết quả mong đợi** | `{"ok": true, "words": [...], "count": N}` |
+| **Kết quả thực tế** | ✅ PASS |
 
 ---
 
-### TC-API-14: ADD_BLACKLIST khong co Owner Key
+### TC-API-14: ADD_BLACKLIST không có Owner Key
 
-| Truong | Noi dung |
+| Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-API-14 |
-| **Mo ta** | Gui ADD_BLACKLIST voi key khong phai owner |
-| **Buoc thuc hien** | Dung key phu goi `{"action": "ADD_BLACKLIST", "guild_id": "123", "word": "test"}` |
-| **Ket qua mong doi** | HTTP 403, `{"error": "Unauthorized"}` |
-| **Ket qua thuc te** | ✅ PASS |
+| **Mô tả** | Gửi ADD_BLACKLIST với key không phải owner |
+| **Bước thực hiện** | Dùng key phụ gọi `{"action": "ADD_BLACKLIST", "guild_id": "123", "word": "test"}` |
+| **Kết quả mong đợi** | HTTP 403, `{"error": "Unauthorized"}` |
+| **Kết quả thực tế** | ✅ PASS |
 
 ---
 
