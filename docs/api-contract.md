@@ -1,106 +1,195 @@
-# Đặc tả Giao diện Lập trình API (API Contract Specification)
+# Dac ta Giao dien Lap trinh API (API Contract Specification)
 
-Tài liệu này định nghĩa chi tiết các API endpoints được cung cấp bởi API Server nội bộ của Bot (`core/api_server.py`) nhằm phục vụ Web Dashboard của Nhóm 69.
+Tai lieu nay dinh nghia chi tiet cac API endpoints duoc cung cap boi API Server noi bo cua Bot (`core/api_server.py`) nham phuc vu Web Dashboard.
 
 ---
 
-## 🔒 1. Xác thực (Authentication)
+## 1. Xac thuc (Authentication)
 
-Tất cả các API endpoints đều yêu cầu header xác thực `X-API-Key` để bảo mật thông tin cấu hình bot.
+Tat ca cac API endpoints deu yeu cau header xac thuc `X-API-Key` de bao mat thong tin cau hinh bot.
 
 - **Header name:** `X-API-Key`
-- **Giá trị:** Khóa bí mật được định nghĩa trong `config.json` hoặc biến môi trường `API_SECRET`.
+- **Gia tri:** Khoa bi mat duoc dinh nghia trong `config.json` (`api_secret`) hoac bien moi truong `API_SECRET`.
 
 ---
 
-## 📡 2. Các Endpoints Chi Tiết
+## 2. Endpoint chinh
 
-### 📊 2.1 Lấy Thống kê Trạng thái Bot (Get Bot Stats)
-- **Endpoint:** `GET /api/stats`
-- **Headers:** `X-API-Key: <secret>`
-- **Response (200 OK):**
-```json
-{
-  "status": "online",
-  "latency_ms": 45.2,
-  "guilds_count": 2,
-  "users_count": 1420,
-  "uptime_seconds": 86400,
-  "cpu_usage_pct": 5.4,
-  "memory_usage_mb": 124.5
-}
+Tat ca cac action deu gui qua **mot endpoint duy nhat**:
+
+```
+POST /api
+Content-Type: application/json
+X-API-Key: <secret>
+
+{ "action": "<ACTION_NAME>", ... }
 ```
 
 ---
 
-### 💬 2.2 Cập nhật Cấu hình AI Chatbot (Update AI Config)
-- **Endpoint:** `POST /api/config/ai`
-- **Headers:**
-  - `X-API-Key: <secret>`
-  - `Content-Type: application/json`
-- **Request Body:**
+## 2.1 Thong ke Co ban — GET_DASHBOARD_STATS
+
 ```json
+// Request
+{ "action": "GET_DASHBOARD_STATS" }
+
+// Response
 {
-  "gemini_api_key": "AIzaSy...",
-  "ai_system_prompt": "Bạn là trợ lý ảo Discord thân thiện...",
-  "automod_mute_minutes": 10
-}
-```
-- **Response (200 OK):**
-```json
-{
-  "status": "success",
-  "message": "Cấu hình AI đã được cập nhật thành công!"
+  "ok": true, "bot_status": "Online",
+  "total_servers": 2, "total_users": 1420,
+  "ping_ms": 45, "loaded_cogs": ["Music", "Moderation"],
+  "active_voice_channels": 3
 }
 ```
 
 ---
 
-### 🎭 2.3 Lấy cấu hình Reaction Roles (Get Reaction Roles)
-- **Endpoint:** `GET /api/config/reaction-roles`
-- **Headers:** `X-API-Key: <secret>`
-- **Response (200 OK):**
+## 2.2 Thong ke Nang cao — GET_BOT_METRICS (Issue #32)
+
 ```json
+// Request
+{ "action": "GET_BOT_METRICS" }
+
+// Response
 {
-  "rr_channel_id": "1458038155562319875",
-  "rr_title": "Bảng đăng ký vai trò",
-  "rr_roles_list": [
-    {
-      "role_id": "708859115396399125",
-      "role_name": "Game thủ",
-      "emoji": "🎮"
-    },
-    {
-      "role_id": "708859109448876065",
-      "role_name": "Lập trình viên",
-      "emoji": "💻"
-    }
-  ]
+  "ok": true, "guilds": 2, "total_members": 1420,
+  "voice_connections": 3, "latency_ms": 45,
+  "loaded_cogs": ["Music", "AIChatbot"],
+  "ai_active_sessions": 5,
+  "ai_model": "gemini-1.5-flash",
+  "ai_api_configured": true,
+  "db_users": 100, "db_warnings": 12, "db_ai_messages": 340
 }
 ```
 
 ---
 
-### ⚙️ 2.4 Cập nhật Cấu hình Reaction Roles (Update Reaction Roles)
-- **Endpoint:** `POST /api/config/reaction-roles`
-- **Headers:**
-  - `X-API-Key: <secret>`
-  - `Content-Type: application/json`
-- **Request Body:**
+## 2.3 Trang thai AI — GET_AI_STATUS
+
 ```json
+{ "action": "GET_AI_STATUS" }
+// Response
 {
-  "rr_channel_id": "1458038155562319875",
-  "rr_title": "Bảng chọn vai trò thành viên",
-  "rr_roles_list": [
-    "708859115396399125",
-    "708859109448876065"
-  ]
+  "ok": true,
+  "gemini_api_configured": true,
+  "ai_channel_id": "122333444555666",
+  "ai_system_prompt": "Ban la tro ly ao..."
 }
 ```
-- **Response (200 OK):**
+
+## 2.4 Cau hinh AI — SET_AI_CONFIG (Owner key)
+
 ```json
 {
-  "status": "success",
-  "message": "Cấu hình Reaction Roles đã được đồng bộ!"
+  "action": "SET_AI_CONFIG",
+  "payload": {
+    "ai_channel_id": "122333444555666",
+    "ai_system_prompt": "Ban la tro ly ao Discord than thien."
+  }
 }
 ```
+
+---
+
+## 2.5 Lich su hoi thoai AI — GET_CHAT_HISTORY (Issue #32)
+
+```json
+// Request
+{ "action": "GET_CHAT_HISTORY", "guild_id": "111222333", "user_id": "444555", "limit": 50 }
+
+// Response
+{
+  "ok": true,
+  "history": [
+    { "user_id": "444555", "role": "user", "content": "Xin chao!", "timestamp": 1718000000.0 },
+    { "user_id": "444555", "role": "model", "content": "Chao ban!", "timestamp": 1718000005.0 }
+  ],
+  "count": 2
+}
+```
+
+## 2.6 Xoa lich su AI — CLEAR_CHAT_HISTORY (Issue #32, Owner key)
+
+```json
+// Xoa 1 user
+{ "action": "CLEAR_CHAT_HISTORY", "guild_id": "111222333", "user_id": "444555" }
+// Xoa ca guild
+{ "action": "CLEAR_CHAT_HISTORY", "guild_id": "111222333" }
+// Response: { "ok": true, "deleted": 42 }
+```
+
+---
+
+## 2.7 Quan ly Blacklist — LIST / ADD / REMOVE (Issue #32)
+
+```json
+// Lay danh sach tu cam
+{ "action": "LIST_BLACKLIST", "guild_id": "111222333" }
+// -> { "ok": true, "words": ["badword1", "badword2"], "count": 2 }
+
+// Them tu cam (Owner key)
+{ "action": "ADD_BLACKLIST", "guild_id": "111222333", "word": "badword" }
+
+// Xoa tu cam (Owner key)
+{ "action": "REMOVE_BLACKLIST", "guild_id": "111222333", "word": "badword" }
+```
+
+---
+
+## 2.8 Reaction Roles — SPAWN_RR_PANEL
+
+```json
+{
+  "action": "SPAWN_RR_PANEL",
+  "payload": {
+    "guild_id": "111222333",
+    "channel_id": "122333444555666",
+    "title": "Chon vai tro",
+    "desc": "Nhan nut de chon role",
+    "footer": "Ho tro: @Admin",
+    "roles": [{ "name": "Gamer", "desc": "Nhan thong bao game" }]
+  }
+}
+```
+
+---
+
+## 2.9 Cau hinh he thong — GET_CONFIG / UPDATE_CONFIG (Owner key)
+
+```json
+{ "action": "GET_CONFIG" }
+{ "action": "UPDATE_CONFIG", "payload": { "prefix": "!", "api_port": 8080 } }
+```
+
+---
+
+## 3. Health Check Endpoint
+
+```
+GET /health
+```
+Tra ve JSON trang thai bot (khong yeu cau API Key). Dung cho Render Cloud uptime monitoring.
+
+```json
+{
+  "status": "ok", "bot_online": true,
+  "guilds": 2, "latency_ms": 45,
+  "uptime": "02h 14m 37s",
+  "database": "postgresql", "environment": "production"
+}
+```
+
+---
+
+## 4. Bao mat & Gioi han
+
+| Tinh nang | Chi tiet |
+|-----------|----------|
+| Rate Limiting | Toi da 30 request/phut/IP tren /api |
+| CORS | Cho phep * (ho tro Dashboard tu moi origin) |
+| Payload limit | Toi da 64 KB moi request |
+| Auth | Header X-API-Key bat buoc; mot so action chi Owner key |
+
+---
+
+*Tai lieu cap nhat theo Issue #32 - Tuan 4.1 (Backend: Tran Duc Manh)*

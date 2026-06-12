@@ -228,6 +228,157 @@ def create_handle_api(bot):
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
 
+        # ---------------------------------------------------------------
+        # Issue #32 — New Backend API Endpoints for Web Dashboard
+        # ---------------------------------------------------------------
+
+        elif action == "GET_CHAT_HISTORY":
+            """Lấy lịch sử hội thoại AI theo guild (và tùy chọn theo user)."""
+            guild_id = data.get("guild_id", "")
+            user_id = data.get("user_id", None)
+            limit = min(int(data.get("limit", 50)), 200)
+            try:
+                with db_lock:
+                    if user_id:
+                        cursor.execute(
+                            "SELECT user_id, role, content, timestamp FROM ai_conversations "
+                            "WHERE guild_id=? AND user_id=? ORDER BY timestamp DESC LIMIT ?",
+                            (str(guild_id), str(user_id), limit)
+                        )
+                    else:
+                        cursor.execute(
+                            "SELECT user_id, role, content, timestamp FROM ai_conversations "
+                            "WHERE guild_id=? ORDER BY timestamp DESC LIMIT ?",
+                            (str(guild_id), limit)
+                        )
+                    rows = cursor.fetchall()
+                history = [
+                    {"user_id": r[0], "role": r[1], "content": r[2], "timestamp": r[3]}
+                    for r in rows
+                ]
+                return web.json_response({"ok": True, "history": history, "count": len(history)})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "CLEAR_CHAT_HISTORY":
+            """Xóa lịch sử hội thoại AI theo guild hoặc user cụ thể."""
+            if auth != API_SECRET:
+                return web.json_response({"ok": False, "error": "Unauthorized"}, status=403)
+            guild_id = data.get("guild_id", "")
+            user_id = data.get("user_id", None)
+            try:
+                with db_lock:
+                    if user_id:
+                        cursor.execute(
+                            "DELETE FROM ai_conversations WHERE guild_id=? AND user_id=?",
+                            (str(guild_id), str(user_id))
+                        )
+                    else:
+                        cursor.execute(
+                            "DELETE FROM ai_conversations WHERE guild_id=?",
+                            (str(guild_id),)
+                        )
+                    conn.commit()
+                    deleted = cursor.rowcount
+                # Also clear in-memory sessions in AIChatbot cog
+                ai_cog = bot.cogs.get("AIChatbot")
+                if ai_cog:
+                    if user_id:
+                        ai_cog.chat_sessions.pop((int(guild_id), int(user_id)), None)
+                    else:
+                        keys = [k for k in ai_cog.chat_sessions if str(k[0]) == str(guild_id)]
+                        for k in keys:
+                            del ai_cog.chat_sessions[k]
+                return web.json_response({"ok": True, "deleted": deleted})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "GET_BOT_METRICS":
+            """Thống kê nâng cao: tổng messages, AI sessions, bảng DB."""
+            try:
+                metrics = {
+                    "ok": True,
+                    "guilds": len(bot.guilds),
+                    "total_members": sum(g.member_count or 0 for g in bot.guilds),
+                    "voice_connections": len(bot.voice_clients),
+                    "latency_ms": round(bot.latency * 1000) if bot.latency else 0,
+                    "loaded_cogs": list(bot.cogs.keys()),
+                }
+                # AI session stats
+                ai_cog = bot.cogs.get("AIChatbot")
+                metrics["ai_active_sessions"] = len(ai_cog.chat_sessions) if ai_cog else 0
+                metrics["ai_model"] = ai_cog.model_name if ai_cog else "N/A"
+                metrics["ai_api_configured"] = bool(os.environ.get("GEMINI_API_KEY"))
+                # DB counts
+                with db_lock:
+                    cursor.execute("SELECT COUNT(*) FROM users")
+                    metrics["db_users"] = (cursor.fetchone() or [0])[0]
+                    cursor.execute("SELECT COUNT(*) FROM warnings")
+                    metrics["db_warnings"] = (cursor.fetchone() or [0])[0]
+                    cursor.execute("SELECT COUNT(*) FROM ai_conversations")
+                    metrics["db_ai_messages"] = (cursor.fetchone() or [0])[0]
+                return web.json_response(metrics)
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "LIST_BLACKLIST":
+            """Lấy danh sách từ cấm theo guild."""
+            guild_id = data.get("guild_id", "")
+            if not guild_id:
+                return web.json_response({"ok": False, "error": "Thiếu guild_id"})
+            try:
+                with db_lock:
+                    cursor.execute(
+                        "SELECT word FROM blacklists WHERE guild_id=? ORDER BY word ASC",
+                        (str(guild_id),)
+                    )
+                    words = [r[0] for r in cursor.fetchall()]
+                return web.json_response({"ok": True, "guild_id": guild_id, "words": words, "count": len(words)})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "ADD_BLACKLIST":
+            """Thêm từ vào danh sách cấm."""
+            if auth != API_SECRET:
+                return web.json_response({"ok": False, "error": "Unauthorized"}, status=403)
+            guild_id = data.get("guild_id", "")
+            word = data.get("word", "").strip().lower()
+            if not guild_id or not word:
+                return web.json_response({"ok": False, "error": "Thiếu guild_id hoặc word"})
+            try:
+                with db_lock:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO blacklists (guild_id, word) VALUES (?, ?)",
+                        (str(guild_id), word)
+                    )
+                    conn.commit()
+                return web.json_response({"ok": True, "msg": f"'{word}' đã được thêm vào blacklist."})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "REMOVE_BLACKLIST":
+            """Xóa từ khỏi danh sách cấm."""
+            if auth != API_SECRET:
+                return web.json_response({"ok": False, "error": "Unauthorized"}, status=403)
+            guild_id = data.get("guild_id", "")
+            word = data.get("word", "").strip().lower()
+            if not guild_id or not word:
+                return web.json_response({"ok": False, "error": "Thiếu guild_id hoặc word"})
+            try:
+                with db_lock:
+                    cursor.execute(
+                        "DELETE FROM blacklists WHERE guild_id=? AND word=?",
+                        (str(guild_id), word)
+                    )
+                    conn.commit()
+                    deleted = cursor.rowcount
+                if deleted:
+                    return web.json_response({"ok": True, "msg": f"'{word}' đã được xóa khỏi blacklist."})
+                else:
+                    return web.json_response({"ok": False, "error": f"'{word}' không có trong blacklist."})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
         return web.json_response({"ok": False, "error": "Unknown action"}, status=400)
     return handle_api
 

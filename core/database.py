@@ -121,6 +121,15 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS quiz_questions (
                     option_d TEXT,
                     correct_option TEXT
                 )''')
+# Bảng lưu lịch sử hội thoại AI — Issue #32
+cursor.execute('''CREATE TABLE IF NOT EXISTS ai_conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT,
+                    user_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    timestamp REAL
+                )''')
 conn.commit()
 
 def db_get_user(guild_id, user_id):
