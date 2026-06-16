@@ -317,6 +317,13 @@ def create_handle_api(bot):
                     metrics["db_warnings"] = (cursor.fetchone() or [0])[0]
                     cursor.execute("SELECT COUNT(*) FROM ai_conversations")
                     metrics["db_ai_messages"] = (cursor.fetchone() or [0])[0]
+                    
+                    # Thống kê token sử dụng (Issue #35 - Duy AI/ML)
+                    cursor.execute("SELECT SUM(prompt_tokens), SUM(completion_tokens), SUM(total_tokens) FROM ai_token_usage")
+                    token_row = cursor.fetchone()
+                    metrics["ai_total_prompt_tokens"] = token_row[0] or 0 if token_row else 0
+                    metrics["ai_total_completion_tokens"] = token_row[1] or 0 if token_row else 0
+                    metrics["ai_total_tokens"] = token_row[2] or 0 if token_row else 0
                 return web.json_response(metrics)
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})

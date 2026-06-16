@@ -239,6 +239,32 @@
                         </form>
                     </div>
                 </div>
+
+                <!-- Panel Thống Kê Token (Issue #35 - Duy AI/ML) -->
+                <div class="card-glass card-panel margin-top-20">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i data-lucide="bar-chart-3"></i>
+                            <h3>Thống Kê Tiêu Thụ Token Gemini</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="token-stats-grid">
+                            <div class="token-stat-item animate-fade-in">
+                                <span class="token-stat-label">Prompt Tokens (Input)</span>
+                                <span class="token-stat-value" id="ai-prompt-tokens">0</span>
+                            </div>
+                            <div class="token-stat-item animate-fade-in" style="animation-delay: 100ms;">
+                                <span class="token-stat-label">Completion Tokens (Output)</span>
+                                <span class="token-stat-value" id="ai-completion-tokens">0</span>
+                            </div>
+                            <div class="token-stat-item font-bold animate-fade-in" style="animation-delay: 200ms;">
+                                <span class="token-stat-label text-gradient-purple">Tổng Token Tiêu Thụ</span>
+                                <span class="token-stat-value text-gradient-purple" id="ai-total-tokens">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- SECTION 3: REACTION ROLES -->

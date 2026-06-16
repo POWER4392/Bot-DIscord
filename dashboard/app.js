@@ -229,9 +229,24 @@ document.addEventListener("DOMContentLoaded", () => {
             // Load Channel Dropdowns
             populateDropdowns();
 
-            // Set AI configured channel
+             // Set AI configured channel
             if (globalConfig.ai_channel_id) {
                 aiChannelSelect.value = globalConfig.ai_channel_id;
+            }
+
+            // Get Bot Metrics for Token Usage (Issue #35 - Duy AI/ML)
+            try {
+                const metricsRes = await fetchFromAPI("GET_BOT_METRICS");
+                if (metricsRes.ok) {
+                    const promptVal = document.getElementById("ai-prompt-tokens");
+                    const completionVal = document.getElementById("ai-completion-tokens");
+                    const totalVal = document.getElementById("ai-total-tokens");
+                    if (promptVal) promptVal.textContent = (metricsRes.ai_total_prompt_tokens || 0).toLocaleString();
+                    if (completionVal) completionVal.textContent = (metricsRes.ai_total_completion_tokens || 0).toLocaleString();
+                    if (totalVal) totalVal.textContent = (metricsRes.ai_total_tokens || 0).toLocaleString();
+                }
+            } catch (err) {
+                console.warn("Lỗi khi lấy thông số token metrics:", err);
             }
 
             // Update connection state UI
@@ -346,6 +361,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         populateDropdowns();
         aiChannelSelect.value = globalConfig.ai_channel_id;
+        
+        // Mock token statistics (Issue #35 - Duy AI/ML)
+        const promptVal = document.getElementById("ai-prompt-tokens");
+        const completionVal = document.getElementById("ai-completion-tokens");
+        const totalVal = document.getElementById("ai-total-tokens");
+        if (promptVal) promptVal.textContent = "124,530";
+        if (completionVal) completionVal.textContent = "85,240";
+        if (totalVal) totalVal.textContent = "209,770";
     };
 
     // 5. Save System Config

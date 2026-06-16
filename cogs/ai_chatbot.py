@@ -5,6 +5,8 @@ from discord import app_commands
 import google.generativeai as genai
 import os
 import time
+import PIL.Image
+import io
 
 from core.database import cursor, conn, db_lock
 
@@ -127,6 +129,63 @@ class AIChatbot(commands.Cog):
             print(f"[AI DB] Loi xoa lich su: {e}")
 
     # ------------------------------------------------------------------
+    # Helper: RAG retrieval from server rules/instructions
+    # ------------------------------------------------------------------
+    def _retrieve_relevant_rules(self, query: str) -> str:
+        rules_path = "docs/server_rules.txt"
+        if not os.path.exists(rules_path):
+            return ""
+        try:
+            with open(rules_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Chia nhỏ theo tiêu đề phần (Markdown headers)
+            sections = content.split("\n## ")
+            relevant_sections = []
+            
+            # Tách từ khóa từ câu hỏi (chuyển thường, bỏ dấu câu và chỉ lấy từ dài hơn 2 ký tự)
+            words = [w.strip(",.?/!").lower() for w in query.split() if len(w) > 2]
+            
+            for section in sections:
+                # Thêm lại ký tự ## nếu không phải phần đầu tiên
+                full_section = ("## " + section) if not section.startswith("# ") else section
+                score = 0
+                section_lower = full_section.lower()
+                for word in words:
+                    if word in section_lower:
+                        score += 1
+                if score > 0:
+                    relevant_sections.append((score, full_section))
+            
+            if not relevant_sections:
+                return ""
+            
+            # Sắp xếp theo score giảm dần và lấy tối đa 2 phần liên quan nhất
+            relevant_sections.sort(key=lambda x: x[0], reverse=True)
+            top_sections = [sec[1] for sec in relevant_sections[:2]]
+            
+            context = "\n\n".join(top_sections)
+            return context
+        except Exception as e:
+            print(f"[RAG Error] Loi khi truy van luat le: {e}")
+            return ""
+
+    # ------------------------------------------------------------------
+    # DB: Lưu thống kê token sử dụng
+    # ------------------------------------------------------------------
+    def _save_token_usage_to_db(self, guild_id: int, user_id: int, prompt_tokens: int, completion_tokens: int, total_tokens: int):
+        try:
+            with db_lock:
+                cursor.execute(
+                    "INSERT INTO ai_token_usage (guild_id, user_id, prompt_tokens, completion_tokens, total_tokens, timestamp) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (str(guild_id), str(user_id), prompt_tokens, completion_tokens, total_tokens, time.time())
+                )
+                conn.commit()
+        except Exception as e:
+            print(f"[AI DB] Loi luu thong ke token: {e}")
+
+    # ------------------------------------------------------------------
     # on_message: phản hồi trong AI channel hoặc khi được mention
     # ------------------------------------------------------------------
     @commands.Cog.listener()
@@ -163,9 +222,9 @@ class AIChatbot(commands.Cog):
     # ------------------------------------------------------------------
     # Slash command: /ask
     # ------------------------------------------------------------------
-    @app_commands.command(name="ask", description="Hỏi AI Chatbot bất kỳ điều gì!")
-    @app_commands.describe(question="Câu hỏi của bạn")
-    async def ask(self, interaction: discord.Interaction, question: str):
+    @app_commands.command(name="ask", description="Hỏi AI Chatbot bất kỳ điều gì (hỗ trợ đính kèm hình ảnh)!")
+    @app_commands.describe(question="Câu hỏi của bạn hoặc lời nhắc cho hình ảnh", image="Hình ảnh đính kèm (không bắt buộc)")
+    async def ask(self, interaction: discord.Interaction, question: str, image: discord.Attachment = None):
         if not self.model:
             await interaction.response.send_message(
                 "⚠️ Tính năng AI Chatbot chưa được cấu hình. Vui lòng liên hệ Admin!",
@@ -179,7 +238,8 @@ class AIChatbot(commands.Cog):
             interaction.user,
             interaction.guild,
             question,
-            interaction=interaction
+            interaction=interaction,
+            attachment=image
         )
 
     # ------------------------------------------------------------------
@@ -207,7 +267,8 @@ class AIChatbot(commands.Cog):
         guild: discord.Guild,
         content: str,
         reply_target=None,
-        interaction: discord.Interaction = None
+        interaction: discord.Interaction = None,
+        attachment: discord.Attachment = None
     ):
         from core.shared import config
         system_prompt = config.get(
@@ -220,17 +281,65 @@ class AIChatbot(commands.Cog):
 
         async with channel.typing():
             try:
-                session = self._get_session(guild_id, user_id, system_prompt)
+                # Kiểm tra hình ảnh đính kèm (AI Vision)
+                image_target = None
+                if attachment:
+                    if attachment.content_type and attachment.content_type.startswith("image/"):
+                        image_target = attachment
+                elif reply_target and reply_target.attachments:
+                    first_att = reply_target.attachments[0]
+                    if first_att.content_type and first_att.content_type.startswith("image/"):
+                        image_target = first_att
 
-                # Lưu tin nhắn user vào DB
-                self._save_message_to_db(guild_id, user_id, "user", content)
+                # RAG: Truy vấn luật lệ liên quan đến câu hỏi/yêu cầu của người dùng
+                rag_context = self._retrieve_relevant_rules(content)
+                if rag_context:
+                    prompt_with_rag = (
+                        f"[THÔNG TIN THAM KHẢO TỪ LUẬT & HƯỚNG DẪN CỦA SERVER]\n"
+                        f"{rag_context}\n\n"
+                        f"[YÊU CẦU: Hãy trả lời câu hỏi sau dựa trên thông tin tham khảo trên nếu có liên quan. Trả lời ngắn gọn, tự nhiên, bằng tiếng Việt]\n"
+                        f"Câu hỏi: {content}"
+                    )
+                else:
+                    prompt_with_rag = content
 
-                # Gọi Gemini (bất đồng bộ qua executor để không block event loop)
-                response = await self.bot.loop.run_in_executor(
-                    None,
-                    lambda: session.send_message(content)
-                )
-                reply_text = response.text
+                if image_target:
+                    # Đọc và phân tích ảnh với Gemini Vision
+                    image_bytes = await image_target.read()
+                    image_pil = PIL.Image.open(io.BytesIO(image_bytes))
+                    prompt = prompt_with_rag if content else "Hãy phân tích hình ảnh này dựa trên các quy định của server."
+                    
+                    # Lưu tin nhắn user vào DB (chỉ lưu tin nhắn gốc)
+                    self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
+                    
+                    response = await self.bot.loop.run_in_executor(
+                        None,
+                        lambda: self.model.generate_content([prompt, image_pil])
+                    )
+                    reply_text = response.text
+                else:
+                    # Đàm thoại văn bản thuần qua Session
+                    session = self._get_session(guild_id, user_id, system_prompt)
+
+                    # Lưu tin nhắn user vào DB (chỉ lưu tin nhắn gốc để lịch sử sạch sẽ)
+                    self._save_message_to_db(guild_id, user_id, "user", content)
+
+                    # Gọi Gemini (bất đồng bộ qua executor)
+                    response = await self.bot.loop.run_in_executor(
+                        None,
+                        lambda: session.send_message(prompt_with_rag)
+                    )
+                    reply_text = response.text
+
+                # Ghi nhận thống kê token sử dụng vào DB
+                prompt_tokens = 0
+                completion_tokens = 0
+                total_tokens = 0
+                if hasattr(response, "usage_metadata") and response.usage_metadata:
+                    prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+                    completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+                    total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+                self._save_token_usage_to_db(guild_id, user_id, prompt_tokens, completion_tokens, total_tokens)
 
                 # Lưu phản hồi của model vào DB
                 self._save_message_to_db(guild_id, user_id, "model", reply_text)
@@ -240,7 +349,7 @@ class AIChatbot(commands.Cog):
                     reply_text = reply_text[:1990] + "..."
 
                 if interaction:
-                    await interaction.followup.send(f"🤖 **{author.display_name}:** {content}\n\n{reply_text}")
+                    await interaction.followup.send(f"🤖 **{author.display_name}:** {content or '[Hình ảnh]'}\n\n{reply_text}")
                 elif reply_target:
                     await reply_target.reply(reply_text)
                 else:
