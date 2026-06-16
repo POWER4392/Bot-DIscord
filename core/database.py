@@ -121,6 +121,29 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS quiz_questions (
                     option_d TEXT,
                     correct_option TEXT
                 )''')
+# Bảng lưu lịch sử hội thoại AI — Issue #32
+cursor.execute('''CREATE TABLE IF NOT EXISTS ai_conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT,
+                    user_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    timestamp REAL
+                )''')
+# Index để tăng tốc query lịch sử theo user (tránh full-table scan)
+cursor.execute('''CREATE INDEX IF NOT EXISTS idx_ai_conv_user
+                  ON ai_conversations (guild_id, user_id, timestamp DESC)''')
+
+# Bảng lưu thống kê token sử dụng — Issue #35 (Duy AI/ML)
+cursor.execute('''CREATE TABLE IF NOT EXISTS ai_token_usage (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT,
+                    user_id TEXT,
+                    prompt_tokens INTEGER,
+                    completion_tokens INTEGER,
+                    total_tokens INTEGER,
+                    timestamp REAL
+                )''')
 conn.commit()
 
 def db_get_user(guild_id, user_id):

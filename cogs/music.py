@@ -188,15 +188,14 @@ class Music(commands.Cog):
             # YouTube Datacenter WAF Bypass: Bridge YouTube URLs to SoundCloud
             if search.startswith("http") and ("youtube.com" in search or "youtu.be" in search):
                 try:
-                    import requests
                     oembed_url = f"https://www.youtube.com/oembed?url={search}&format=json"
                     r = requests.get(oembed_url, timeout=5)
                     if r.status_code == 200:
                         yt_title = r.json().get('title', '')
                         if yt_title:
                             search = yt_title
-                except Exception as e:
-                    pass # Fallback to normal URL handling if oEmbed fails
+                except Exception:
+                    pass  # Fallback to normal URL handling if oEmbed fails
 
             query = f"scsearch:{search}" if not search.startswith("http") else search
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
