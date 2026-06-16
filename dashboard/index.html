@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Bot Web Dashboard - Admin Portal</title>
+    <title>Discord Bot Web Dashboard - Admin Portal | hendrix810</title>
+    <meta name="description" content="Bảng điều khiển quản trị Discord Bot — Giám sát, cấu hình AI Chatbot, Reaction Roles và kiểm thử bảo mật.">
+    <meta name="author" content="Tống Xuân Nghĩa (@hendrix810) — Issue #31: UI/UX Web Dashboard">
     <!-- Google Fonts: Outfit & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,12 +38,17 @@
                     <span>Cấu hình AI</span>
                 </a>
                 <a href="#reaction-roles" class="nav-item" data-tab="reaction-roles">
-                    <i data-lucide="shield-check"></i>
+                    <i data-lucide="tag"></i>
                     <span>Reaction Roles</span>
                 </a>
                 <a href="#system-config" class="nav-item" data-tab="system-config">
                     <i data-lucide="settings"></i>
                     <span>Cấu hình Hệ thống</span>
+                </a>
+                <a href="#qa-security" class="nav-item" data-tab="qa-security" id="nav-qa">
+                    <i data-lucide="shield-check"></i>
+                    <span>Kiểm Thử & Bảo Mật</span>
+                    <span class="nav-badge">QA</span>
                 </a>
             </nav>
 
@@ -54,6 +61,12 @@
                     <div class="progress-bar-container">
                         <div id="connection-progress" class="progress-bar" style="width: 30%"></div>
                     </div>
+                </div>
+                <!-- Issue #31: UI/UX Web Dashboard — Tống Xuân Nghĩa (hendrix810) -->
+                <div class="author-credit">
+                    <i data-lucide="code-2"></i>
+                    <span>UI/UX by <a href="https://github.com/hendrix810" target="_blank" rel="noopener"><strong>@hendrix810</strong></a></span>
+                    <span class="issue-tag">#31</span>
                 </div>
             </div>
         </aside>
@@ -76,7 +89,7 @@
                         </div>
                         <div class="input-wrapper">
                             <i data-lucide="key-round"></i>
-                            <input type="password" id="api-key" placeholder="API Secret Key" value="changeme123">
+                            <input type="password" id="api-key" placeholder="Nhập API Secret Key" value="">
                         </div>
                         <button id="btn-reconnect" class="btn btn-primary btn-icon-only" title="Kết nối lại">
                             <i data-lucide="refresh-cw"></i>
@@ -170,7 +183,7 @@
                                 </div>
                                 <div class="info-item">
                                     <span class="label">ID:</span>
-                                    <span class="value" id="info-id">123456789012345678</span>
+                                    <span class="value" id="info-id">-</span>
                                 </div>
                                 <div class="info-item">
                                     <span class="label">Phiên bản:</span>
@@ -226,6 +239,32 @@
                         </form>
                     </div>
                 </div>
+
+                <!-- Panel Thống Kê Token (Issue #35 - Duy AI/ML) -->
+                <div class="card-glass card-panel margin-top-20">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i data-lucide="bar-chart-3"></i>
+                            <h3>Thống Kê Tiêu Thụ Token Gemini</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="token-stats-grid">
+                            <div class="token-stat-item animate-fade-in">
+                                <span class="token-stat-label">Prompt Tokens (Input)</span>
+                                <span class="token-stat-value" id="ai-prompt-tokens">0</span>
+                            </div>
+                            <div class="token-stat-item animate-fade-in" style="animation-delay: 100ms;">
+                                <span class="token-stat-label">Completion Tokens (Output)</span>
+                                <span class="token-stat-value" id="ai-completion-tokens">0</span>
+                            </div>
+                            <div class="token-stat-item font-bold animate-fade-in" style="animation-delay: 200ms;">
+                                <span class="token-stat-label text-gradient-purple">Tổng Token Tiêu Thụ</span>
+                                <span class="token-stat-value text-gradient-purple" id="ai-total-tokens">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- SECTION 3: REACTION ROLES -->
@@ -233,7 +272,7 @@
                 <div class="card-glass card-panel">
                     <div class="panel-header">
                         <div class="panel-title">
-                            <i data-lucide="shield-check"></i>
+                            <i data-lucide="tag"></i>
                             <h3>Tạo Bảng Tự Chọn Vai Trò (Reaction Roles)</h3>
                         </div>
                     </div>
@@ -344,6 +383,178 @@
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 5: QA & SECURITY (Đề cao cho Nghĩa - tích hợp fix Long & Viet) -->
+            <section id="tab-qa-security" class="tab-content">
+                <!-- Health Monitor Row (Fix Long #33) -->
+                <div class="stats-grid qa-stats-grid">
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon green">
+                            <i data-lucide="activity"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Uptime</h3>
+                            <div class="value value-sm" id="qa-uptime">-</div>
+                            <span class="stat-desc">Thời gian hoạt động</span>
+                        </div>
+                    </div>
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon blue">
+                            <i data-lucide="database"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Database</h3>
+                            <div class="value value-sm" id="qa-db-type">-</div>
+                            <span class="stat-desc">Loại cơ sở dữ liệu</span>
+                        </div>
+                    </div>
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon purple">
+                            <i data-lucide="cloud"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Môi trường</h3>
+                            <div class="value value-sm" id="qa-environment">-</div>
+                            <span class="stat-desc">Deploy environment</span>
+                        </div>
+                    </div>
+                    <div class="stat-card card-glass card-hover">
+                        <div class="stat-icon amber">
+                            <i data-lucide="shield"></i>
+                        </div>
+                        <div class="stat-data">
+                            <h3>Security Score</h3>
+                            <div class="value value-sm" id="qa-security-score">-</div>
+                            <span class="stat-desc">Điểm bảo mật</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-row">
+                    <!-- Security Audit Panel (Fix Viet #34) -->
+                    <div class="col-6 card-glass card-panel">
+                        <div class="panel-header flex-between">
+                            <div class="panel-title">
+                                <i data-lucide="shield-check"></i>
+                                <h3>Security Audit</h3>
+                            </div>
+                            <button id="btn-run-audit" class="btn btn-primary btn-sm">
+                                <i data-lucide="play"></i>
+                                Chạy Kiểm Thử
+                            </button>
+                        </div>
+                        <div class="panel-body">
+                            <div id="security-checklist" class="security-checklist">
+                                <div class="checklist-placeholder">
+                                    <i data-lucide="shield"></i>
+                                    <p>Nhấn "Chạy Kiểm Thử" để bắt đầu kiểm tra bảo mật hệ thống.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API Health Monitor (Fix Long #33) -->
+                    <div class="col-6 card-glass card-panel">
+                        <div class="panel-header flex-between">
+                            <div class="panel-title">
+                                <i data-lucide="heart-pulse"></i>
+                                <h3>API Health Monitor</h3>
+                            </div>
+                            <button id="btn-refresh-health" class="btn btn-secondary btn-sm">
+                                <i data-lucide="refresh-cw"></i>
+                                Làm mới
+                            </button>
+                        </div>
+                        <div class="panel-body">
+                            <div id="health-monitor" class="health-monitor">
+                                <div class="checklist-placeholder">
+                                    <i data-lucide="activity"></i>
+                                    <p>Đang tải dữ liệu health check...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Endpoints Documentation (For QA Reference) -->
+                <div class="card-glass card-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i data-lucide="book-open"></i>
+                            <h3>Tài Liệu API Endpoints</h3>
+                        </div>
+                        <span class="badge badge-info">Ref: docs/QA_TEST_CASES.md</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="api-docs-grid">
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method get">GET</div>
+                                <div class="endpoint-info">
+                                    <code>/health</code>
+                                    <p>Kiểm tra trạng thái bot, uptime, ping — Không cần auth</p>
+                                </div>
+                                <span class="endpoint-badge public">Public</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api → STATUS</code>
+                                    <p>Lấy thông tin bot (username, guilds, latency)</p>
+                                </div>
+                                <span class="endpoint-badge auth">Auth</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api → GET_DASHBOARD_STATS</code>
+                                    <p>Lấy số liệu tổng quan: servers, users, ping, cogs</p>
+                                </div>
+                                <span class="endpoint-badge auth">Auth</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api → GET_AI_STATUS</code>
+                                    <p>Trạng thái Gemini API, channel ID, system prompt</p>
+                                </div>
+                                <span class="endpoint-badge auth">Auth</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api → SET_AI_CONFIG</code>
+                                    <p>Cập nhật kênh AI và system prompt — Chỉ Owner Key</p>
+                                </div>
+                                <span class="endpoint-badge owner">Owner</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api → UPDATE_CONFIG</code>
+                                    <p>Ghi đè config.json — Chỉ Owner Key</p>
+                                </div>
+                                <span class="endpoint-badge owner">Owner</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api → SPAWN_RR_PANEL</code>
+                                    <p>Tạo bảng Reaction Roles — Xếp hàng qua DB</p>
+                                </div>
+                                <span class="endpoint-badge auth">Auth</span>
+                            </div>
+                            <div class="api-endpoint-card">
+                                <div class="endpoint-method post">POST</div>
+                                <div class="endpoint-info">
+                                    <code>/api &rarr; GET_BOT_METRICS</code>
+                                    <p>Thống kê nâng cao: DB counts, AI sessions, model đang dùng</p>
+                                </div>
+                                <span class="endpoint-badge auth">Auth</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
