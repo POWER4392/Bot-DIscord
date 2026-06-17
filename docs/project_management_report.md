@@ -1,4 +1,4 @@
-# Bao cao Quan tri Du an & Lot trinh Sprint - Tuan 3
+# Bao cao Quan tri Du an & Lot trinh Sprint - Tuan 4
 
 Bao cao duoc thuc hien boi **Do Hoang Long (Project Manager & DevOps Specialist)**.
 
@@ -6,14 +6,40 @@ Bao cao duoc thuc hien boi **Do Hoang Long (Project Manager & DevOps Specialist)
 Du an phat trien he thong Discord Bot duoc van hanh theo quy trinh Agile/Scrum voi cac vai tro:
 * **Product Owner & Backend Lead:** Tran Duc Manh (`POWER4392`) - Thiet ke database, lap trinh REST API Backend.
 * **Scrum Master & PM/DevOps:** Do Hoang Long (`Long432`) - Dieu phoi Sprint, trien khai he thong len Render Cloud.
+* **UI/UX & Content Designer:** Tong Xuan Nghia (`hendrix810`) - Thiet ke giao dien Web Dashboard, GUI, embeds va content.
 * **AI/ML Developer:** Nguyen Duc Duy (`duynguyen1012`) - Phien ban AI Chatbot, chong spam.
 * **QA & Security Analyst:** Mai Van Viet (`vanviet2k6-creator`) - Kiem thu QA va danh gia bao mat.
 
-## 2. Ke hoach cac Sprint (Sprint Backlog & Roadmap)
-Du an chia lam 3 Sprint chinh thuc:
-* **Sprint 1 (Tuan 1):** Phantich yeu cau, khoi tao repository va cau truc DB SQLite.
+## 2. Ke hoach va Phan cong cac Sprint (Sprint Backlog & Assignees)
+Du an chia lam 4 Sprint chinh thuc voi phan cong nhiem vu chi tiet nhu sau:
+
+* **Sprint 1 (Tuan 1):** Phan tich yeu cau, khoi tao repository va cau truc DB SQLite.
+  * **Tran Duc Manh:** Khoi tao main core bot, event handler va setup database connection class.
+  * **Do Hoang Long:** Khoi tao GitHub repo, quan tri tien do va cac vai tro du an.
+  * **Nguyen Duc Duy:** Thiet ke regex scam va thuat toan anti-spam.
+  * **Tong Xuan Nghia:** Phac thao cau truc embeds va kịch ban command line.
+  * **Mai Van Viet:** Xay dung test plan ban dau cho he thong.
+
 * **Sprint 2 (Tuan 2):** Xay dung tinh nang Discord Cog co ban (Moderation, Welcome, Admin GUI local).
+  * **Tran Duc Manh:** Xay dung Moderation Cogs (Kick, Ban, Mute, Clear), Utilities Cogs (Ticket), Music Player base.
+  * **Nguyen Duc Duy:** Viet Economy & Leveling Cogs, Social media crawler system (YouTube, TikTok, Reddit).
+  * **Tong Xuan Nghia:** Thiet ke GUI admin desktop bang `customtkinter` (setting_gui.py).
+  * **Do Hoang Long:** Cấu hình CI/CD workflow, set up global config loader.
+  * **Mai Van Viet:** Viet test cases local, setup file configuration template.
+
 * **Sprint 3 (Tuan 3):** Tich hop AI Chatbot Gemini, xay dung REST API cho dashboard, trien khai cloud deployment.
+  * **Nguyen Duc Duy:** Tich hop Gemini SDK, prompt engineering, anti-spam sliding window cho AI chatbot.
+  * **Tong Xuan Nghia:** Phac thao layout Web Dashboard, structure embeds.
+  * **Tran Duc Manh:** Xay dung REST API endpoints backend, support parameters query.
+  * **Do Hoang Long:** Trien khai code len Render Cloud hosting, cloud database Neon PostgreSQL.
+  * **Mai Van Viet:** Thiet lap test cases kiem thu black-box, white-box cho AI chatbot va REST API.
+
+* **Sprint 4 (Tuan 4):** Nang cap AI Chatbot, hoan thien Web Dashboard va bao mat QA.
+  * **Tong Xuan Nghia (Issue #31):** Lap trinh UI/UX Web Dashboard, HTML/CSS/JS frontend dark mode.
+  * **Tran Duc Manh (Issue #32):** Backend endpoints cho dashboard, nang cap chat history database.
+  * **Do Hoang Long (Issue #33):** Health monitoring check endpoint `/health`, devops uptime check.
+  * **Mai Van Viet (Issue #34):** Trien khai CORS middleware, rate limiter, security audit.
+  * **Nguyen Duc Duy (Issue #35):** AI Vision, database token stats counter analytics.
 
 ## 3. Bang quan ly rui ro (Risk Management Matrix)
 | Rui ro | Muc do anh huong | Ke hoach khac phuc |
