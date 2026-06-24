@@ -6,6 +6,8 @@ from core.shared import db_lock, DB_URL, USE_PG
 
 import time
 
+fallback_to_sqlite = False
+
 if USE_PG:
     db_pool = None
     for attempt in range(5):
@@ -18,9 +20,23 @@ if USE_PG:
             if attempt < 4:
                 time.sleep(3)
             else:
-                print("[DATABASE ERROR] Could not connect to PostgreSQL after 5 attempts.")
-                raise e
+                print("[DATABASE ERROR] Could not connect to PostgreSQL after 5 attempts. Falling back to SQLite.")
+                fallback_to_sqlite = True
+
+if not USE_PG or fallback_to_sqlite:
+    # Update global USE_PG setting so rest of the app knows we are on SQLite
+    import core.shared
+    core.shared.USE_PG = False
     
+    os.makedirs("databases", exist_ok=True)
+    from core.shared import config
+    db_name = config.get("database_name", "bot_core")
+    conn = sqlite3.connect(f"databases/{db_name}.db", check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    cursor = conn.cursor()
+    print(f"[DATABASE] Initialized SQLite database fallback: databases/{db_name}.db")
+else:
     class CloudDBCursor:
         def __init__(self):
             self.description = None
@@ -83,14 +99,6 @@ if USE_PG:
 
     conn = CloudDBConn()
     cursor = CloudDBCursor()
-else:
-    os.makedirs("databases", exist_ok=True)
-    from core.shared import config
-    db_name = config.get("database_name", "bot_core")
-    conn = sqlite3.connect(f"databases/{db_name}.db", check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    cursor = conn.cursor()
 
 # Initialize tables
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (

@@ -6,6 +6,7 @@ from core.shared import config, API_SECRET
 from core.database import cursor, conn, db_lock
 import os
 import asyncio
+import sqlite3
 
 # ---------------------------------------------------------------------------
 # Rate Limiting (Fix #34 - Viet QA/Security)
@@ -92,7 +93,7 @@ async def handle_health(request: web.Request):
         "uptime": f"{hours:02d}h {minutes:02d}m {seconds:02d}s",
         "uptime_seconds": uptime_seconds,
         "loaded_cogs": list(bot.cogs.keys()),
-        "database": "postgresql" if os.environ.get("DATABASE_URL") else "sqlite",
+        "database": "sqlite" if isinstance(cursor, sqlite3.Cursor) else ("postgresql" if os.environ.get("DATABASE_URL") else "sqlite"),
         "environment": "production" if os.environ.get("RENDER") else "development"
     })
 
