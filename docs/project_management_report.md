@@ -49,11 +49,11 @@ Du an chia lam 5 Sprint chinh thuc voi phan cong nhiem vu chi tiet nhu sau:
   * **Do Hoang Long (Issue #46):** Setup CI/CD workflow, auto deploy len Render Cloud.
 
 * **Sprint 5.2 (Tuan 5 - Phan 2):** Kiem thu tong the, sua loi, hoan thien tai lieu SDD va phat hanh Release 0.1.0.
-  * **Tran Duc Manh (Issue #51):** Sua cac loi ve DB lock, review va merge code tu cac nhanh tinh nang.
-  * **Do Hoang Long (Issue #52):** Hop nhat code on dinh vao nhanh `main`, gan tag release `v0.1.0`, verify he thong tren Render Cloud.
+  * **Tran Duc Manh (Issue #55):** Sua cac loi ve DB lock, review va merge code tu cac nhanh tinh nang.
+  * **Do Hoang Long (Issue #56):** Hop nhat code on dinh vao nhanh `main`, gan tag release `v0.1.0`, verify he thong tren Render Cloud.
   * **Nguyen Duc Duy (Issue #53):** Kiem tra an toan token Gemini, error handling cho AI Vision.
   * **Tong Xuan Nghia (Issue #54):** Hoan thien tai lieu dac ta Use Case va standardizing diagrams trong SDD.md.
-  * **Mai Van Viet (Issue #55):** Kiem thu dong goi load_test tren cloud, ky duyet release chat luong bot truoc khi ban giao.
+  * **Mai Van Viet (Issue #57):** Kiem thu dong goi load_test tren cloud, ky duyet release chat luong bot truoc khi ban giao.
 
 ## 3. Bang quan ly rui ro (Risk Management Matrix)
 | Rui ro | Muc do anh huong | Ke hoach khac phuc |
