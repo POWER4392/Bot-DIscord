@@ -388,6 +388,9 @@ bot.add_view(PersistentRoleView(roles_data, f"rr_panel_{msg_id}"))
 | 10 | GUI Cấu hình | ✅ Hoàn thành |
 | 11 | Multi-server support | ✅ Hoàn thành |
 | 12 | Cloud deployment (Render & Neon & UptimeRobot) | ✅ Hoàn thành (Uptime 24/7) |
+| 13 | Chatbot AI tích hợp Gemini SDK (Flash 1.5, Vision, RAG) | ✅ Hoàn thành |
+| 14 | Web Dashboard quản trị trực quan & vẽ biểu đồ (Chart.js) | ✅ Hoàn thành |
+| 15 | Tự động hóa CI/CD Deploy & Bộ kịch bản Test Suite | ✅ Hoàn thành (Release 0.1.0) |
 
 ### 8.2 Điểm nổi bật kỹ thuật
 
@@ -405,37 +408,21 @@ bot.add_view(PersistentRoleView(roles_data, f"rr_panel_{msg_id}"))
 
 Dự án **Discord Bot All-In-One** đã thành công xây dựng một hệ thống phần mềm phức tạp, tích hợp nhiều công nghệ hiện đại:
 
-- **AI/ML**: Pattern matching, anomaly detection, gamification algorithm
-- **Backend**: Async Python, dual database, REST API
-- **Frontend**: Desktop GUI với customtkinter
-- **DevOps**: Cloud deployment trên Render, CSDL Neon PostgreSQL, giám sát tự động 24/7 qua UptimeRobot, CI/CD tự động qua GitHub
+- **AI/ML**: Pattern matching, anomaly detection, gamification algorithm, Gemini conversational AI & Vision.
+- **Backend**: Async Python, dual database, REST API.
+- **Frontend**: Desktop GUI (customtkinter) và Web Dashboard (HTML/CSS/JS/Chart.js).
+- **DevOps**: Cloud deployment trên Render, CSDL Neon PostgreSQL, giám sát tự động 24/7 qua UptimeRobot, CI/CD tự động qua GitHub Actions.
 
 Bot đang hoạt động ổn định trên môi trường production với khả năng phục vụ nhiều Discord server cùng lúc, tự động hóa 90% công tác quản lý server thông thường.
 
-### 8.3 Kế hoạch tuần tiếp theo (Chi tiết phân chia nhiệm vụ / Issues)
+### 9.1 Kế hoạch bảo trì và phát triển tiếp theo
 
-Chi tiết phân chia nhiệm vụ cho các thành viên trong tuần tiếp theo để triển khai các mục tiêu mới:
+Sau khi phát hành phiên bản **Release 0.1.0**, định hướng phát triển tiếp theo của dự án bao gồm:
 
-1. **Nguyễn Đức Duy (AI/ML & Feature Integration Engineer)**
-   - Tích hợp API Gemini/GPT để xây dựng chatbot AI đàm thoại thông minh trên Discord.
-   - Nghiên cứu mô hình học máy (Machine Learning) phát hiện spam tin nhắn nâng cao để thay thế hoặc nâng cấp bộ lọc hiện tại.
-
-2. **Tống Xuân Nghĩa (UI/UX & Content Designer)**
-   - Thiết kế giao diện (UI/UX) và lập trình giao diện frontend cơ bản cho Web Dashboard quản trị thay thế GUI CustomTkinter.
-   - Biên soạn nội dung, kịch bản chạy demo thực tế và hỗ trợ chuẩn bị slide thuyết trình hoàn chỉnh.
-
-3. **Trần Đức Mạnh (Backend Developer)**
-   - Thiết kế và phát triển các API endpoint ở backend để hỗ trợ Web Dashboard.
-   - Tích hợp kết nối API Gemini/GPT ở phía backend và tối ưu hóa database.
-
-4. **Đỗ Hoàng Long (DevOps & Cloud Deployment)**
-   - Quản trị tiến độ dự án tuần mới, giám sát hoạt động hệ thống.
-   - Cấu hình môi trường và triển khai thử nghiệm Web Dashboard lên môi trường Render Cloud & Neon PostgreSQL.
-   - Xây dựng kịch bản chạy demo thực tế và chuẩn bị video thuyết trình dự phòng.
-
-5. **Mai Văn Việt (QA & Security Engineer)**
-   - Lập kịch bản kiểm thử (Test Cases) chi tiết cho tính năng Chatbot AI đàm thoại và Web Dashboard mới.
-   - Thực hiện kiểm thử phát hiện lỗi (QA) trên local và cloud, kiểm thử bảo mật cho các API endpoint mới và đảm bảo an toàn thông tin cấu hình.
+1. **Bảo mật**: Nâng cấp cơ chế xác thực cho Web Dashboard sử dụng OAuth2 trực tiếp qua tài khoản Discord.
+2. **Hiệu năng & Chi phí**: Tối ưu hóa bộ nhớ đệm (Caching) cho dữ liệu chatbot AI nhằm giảm tần suất gọi API Gemini, tối thiểu hóa chi phí token.
+3. **Mở rộng tính năng**: Phát triển thêm tính năng sao lưu (Backup) cấu hình server tự động lên đám mây.
+4. **Vận hành**: Tiếp tục giám sát và xử lý lỗi phát sinh (nếu có) trên production qua log hệ thống.
 
 ---
 

@@ -1,0 +1,23 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Render Cloud
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deploy Webhook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "❌ Error: RENDER_DEPLOY_HOOK secret is not set!"
+            exit 1
+          fi
+          echo "🚀 Triggering Render Deployment..."
+          curl -f -X POST "$RENDER_DEPLOY_HOOK"
+          echo "✅ Deployment triggered successfully!"

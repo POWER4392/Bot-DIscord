@@ -5,7 +5,7 @@ from psycopg2 import pool
 from core.shared import db_lock, DB_URL, USE_PG
 
 if USE_PG:
-    db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, DB_URL)
+    db_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DB_URL)
     
     class CloudDBCursor:
         def __init__(self):
@@ -74,6 +74,8 @@ else:
     from core.shared import config
     db_name = config.get("database_name", "bot_core")
     conn = sqlite3.connect(f"databases/{db_name}.db", check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
     cursor = conn.cursor()
 
 # Initialize tables
@@ -144,6 +146,11 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS ai_token_usage (
                     total_tokens INTEGER,
                     timestamp REAL
                 )''')
+try:
+    cursor.execute("ALTER TABLE ai_token_usage ADD COLUMN latency_ms INTEGER DEFAULT 0")
+    conn.commit()
+except Exception:
+    pass
 conn.commit()
 
 def db_get_user(guild_id, user_id):

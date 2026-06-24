@@ -108,6 +108,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 pageTitle.textContent = tabDetails[tabId].title;
                 pageSubtitle.textContent = tabDetails[tabId].subtitle;
             }
+
+            // If Reaction Roles tab is loaded, reload the active panels
+            if (tabId === "reaction-roles") {
+                loadReactionRoles();
+            }
         });
     });
 
@@ -169,6 +174,213 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error(`API Error on ${action}:`, error);
             throw error;
         }
+    };
+
+    // -------------------------------------------------------------
+    // Sprint 5.1 Additions: Chart.js & Reaction Roles List
+    // -------------------------------------------------------------
+    let tokenChart = null;
+
+    const initOrUpdateTokenChart = (historyData) => {
+        const ctx = document.getElementById('token-usage-chart');
+        if (!ctx) return;
+
+        const labels = historyData.map((d, index) => {
+            if (d.timestamp) {
+                const date = new Date(d.timestamp * 1000);
+                return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+            }
+            return `Lần ${index + 1}`;
+        });
+
+        const promptTokens = historyData.map(d => d.prompt_tokens);
+        const completionTokens = historyData.map(d => d.completion_tokens);
+        const latency = historyData.map(d => d.latency_ms || 0);
+
+        if (tokenChart) {
+            tokenChart.data.labels = labels;
+            tokenChart.data.datasets[0].data = promptTokens;
+            tokenChart.data.datasets[1].data = completionTokens;
+            tokenChart.data.datasets[2].data = latency;
+            tokenChart.update();
+        } else {
+            tokenChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Prompt Tokens',
+                            data: promptTokens,
+                            borderColor: '#A855F7',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Completion Tokens',
+                            data: completionTokens,
+                            borderColor: '#00B0F4',
+                            backgroundColor: 'rgba(0, 176, 244, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Độ trễ (ms)',
+                            data: latency,
+                            borderColor: '#23A55A',
+                            borderWidth: 1.5,
+                            borderDash: [5, 5],
+                            pointStyle: 'circle',
+                            pointRadius: 3,
+                            tension: 0.1,
+                            fill: false,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#8B949E',
+                                font: { family: 'Plus Jakarta Sans', size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#8B949E', font: { family: 'Plus Jakarta Sans', size: 9 } }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#8B949E', font: { family: 'Plus Jakarta Sans', size: 9 } },
+                            title: { display: true, text: 'Tokens', color: '#8B949E' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#8B949E', font: { family: 'Plus Jakarta Sans', size: 9 } },
+                            title: { display: true, text: 'Độ trễ (ms)', color: '#8B949E' }
+                        }
+                    }
+                }
+            });
+        }
+    };
+
+    const loadReactionRoles = async () => {
+        const listContainer = document.getElementById("rr-panels-list");
+        if (!listContainer) return;
+
+        if (isMockMode) {
+            const mockPanels = [
+                {
+                    message_id: "123456789012345678",
+                    guild_id: "111222333",
+                    roles: [
+                        { name: "Ban Cán Sự Class" },
+                        { name: "Thành viên nhóm" }
+                    ]
+                }
+            ];
+            renderReactionRoles(mockPanels);
+            return;
+        }
+
+        try {
+            const res = await fetchFromAPI("GET_REACTION_ROLES");
+            if (res.ok && res.panels) {
+                renderReactionRoles(res.panels);
+            } else {
+                listContainer.innerHTML = `<div class="badge-loading" style="padding: 10px; color: var(--danger);">Không thể lấy danh sách: ${res.error || 'Lỗi không xác định'}</div>`;
+            }
+        } catch (err) {
+            listContainer.innerHTML = `<div class="badge-loading" style="padding: 10px; color: var(--danger);">Lỗi kết nối: ${err.message}</div>`;
+        }
+    };
+
+    const renderReactionRoles = (panels) => {
+        const listContainer = document.getElementById("rr-panels-list");
+        if (!listContainer) return;
+
+        if (!panels || panels.length === 0) {
+            listContainer.innerHTML = '<div class="badge-loading" style="padding: 20px; text-align: center;">Không có Reaction Role panel nào đang hoạt động.</div>';
+            return;
+        }
+
+        listContainer.innerHTML = "";
+        panels.forEach(panel => {
+            const card = document.createElement("div");
+            card.className = "rr-panel-card animate-fade-in";
+            
+            const guildName = serverData[panel.guild_id]?.name || `Guild ID: ${panel.guild_id}`;
+            
+            let rolesHtml = "";
+            if (Array.isArray(panel.roles)) {
+                panel.roles.forEach(r => {
+                    const name = typeof r === "object" ? r.name : r;
+                    rolesHtml += `<span class="rr-panel-role-badge"><i data-lucide="tag" style="width: 10px; height: 10px;"></i> ${name}</span>`;
+                });
+            }
+
+            card.innerHTML = `
+                <div class="rr-panel-info">
+                    <span class="rr-panel-id">Tin nhắn ID: ${panel.message_id}</span>
+                    <span class="rr-panel-guild"><i data-lucide="server" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> ${guildName}</span>
+                    <div class="rr-panel-roles">${rolesHtml}</div>
+                </div>
+                <button class="btn btn-danger btn-sm btn-delete-rr-panel" data-msg-id="${panel.message_id}">
+                    <i data-lucide="trash-2"></i> Thu hồi
+                </button>
+            `;
+            listContainer.appendChild(card);
+        });
+
+        lucide.createIcons();
+
+        listContainer.querySelectorAll(".btn-delete-rr-panel").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const msgId = btn.getAttribute("data-msg-id");
+                if (!confirm(`Bạn có chắc chắn muốn thu hồi Reaction Roles panel tin nhắn ${msgId} không?`)) {
+                    return;
+                }
+
+                if (isMockMode) {
+                    showToast(`Đã thu hồi Reaction Role panel ${msgId} (Chế độ Demo)!`);
+                    btn.closest(".rr-panel-card").remove();
+                    return;
+                }
+
+                try {
+                    const res = await fetchFromAPI("DELETE_REACTION_ROLE", { message_id: msgId });
+                    if (res.ok) {
+                        showToast(`Đã thu hồi thành công panel tin nhắn ${msgId}!`);
+                        loadReactionRoles();
+                    } else {
+                        showToast(`Lỗi thu hồi: ${res.error}`, "error");
+                    }
+                } catch (err) {
+                    showToast(`Lỗi kết nối: ${err.message}`, "error");
+                }
+            });
+        });
     };
 
     // 4. Load & Synchronize Data
@@ -234,7 +446,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 aiChannelSelect.value = globalConfig.ai_channel_id;
             }
 
-            // Get Bot Metrics for Token Usage (Issue #35 - Duy AI/ML)
             try {
                 const metricsRes = await fetchFromAPI("GET_BOT_METRICS");
                 if (metricsRes.ok) {
@@ -244,10 +455,23 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (promptVal) promptVal.textContent = (metricsRes.ai_total_prompt_tokens || 0).toLocaleString();
                     if (completionVal) completionVal.textContent = (metricsRes.ai_total_completion_tokens || 0).toLocaleString();
                     if (totalVal) totalVal.textContent = (metricsRes.ai_total_tokens || 0).toLocaleString();
+
+                    // Render Chart.js if history exists
+                    if (metricsRes.token_history && metricsRes.token_history.length > 0) {
+                        initOrUpdateTokenChart(metricsRes.token_history);
+                    } else {
+                        // Fallback to empty chart
+                        initOrUpdateTokenChart([
+                            { prompt_tokens: 0, completion_tokens: 0, latency_ms: 0 }
+                        ]);
+                    }
                 }
             } catch (err) {
                 console.warn("Lỗi khi lấy thông số token metrics:", err);
             }
+
+            // Load Reaction Roles
+            await loadReactionRoles();
 
             // Update connection state UI
             apiStatusText.textContent = "Kết nối thành công";
@@ -369,6 +593,24 @@ document.addEventListener("DOMContentLoaded", () => {
         if (promptVal) promptVal.textContent = "124,530";
         if (completionVal) completionVal.textContent = "85,240";
         if (totalVal) totalVal.textContent = "209,770";
+
+        // Mock token chart history
+        const now = Math.floor(Date.now() / 1000);
+        const mockChartHistory = [];
+        for (let i = 14; i >= 0; i--) {
+            const promptTk = Math.floor(5000 + Math.random() * 8000);
+            const complTk = Math.floor(3000 + Math.random() * 5000);
+            mockChartHistory.push({
+                prompt_tokens: promptTk,
+                completion_tokens: complTk,
+                latency_ms: Math.floor(100 + Math.random() * 300),
+                timestamp: now - i * 60
+            });
+        }
+        initOrUpdateTokenChart(mockChartHistory);
+
+        // Load Reaction Roles
+        loadReactionRoles();
     };
 
     // 5. Save System Config
@@ -531,6 +773,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetchFromAPI("SPAWN_RR_PANEL", payload);
             if (res.ok) {
                 showToast("Đã đưa bảng chọn Reaction Role vào hàng đợi gửi tin nhắn của Bot!");
+                setTimeout(loadReactionRoles, 1500); // Reload list after bot posts and saves it
             } else {
                 showToast(res.error || "Gặp lỗi khi yêu cầu gửi bảng chọn.", "error");
             }

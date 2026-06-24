@@ -132,12 +132,25 @@ class AIChatbot(commands.Cog):
     # Helper: RAG retrieval from server rules/instructions
     # ------------------------------------------------------------------
     def _retrieve_relevant_rules(self, query: str) -> str:
-        rules_path = "docs/server_rules.txt"
-        if not os.path.exists(rules_path):
+        docs_dir = "docs"
+        if not os.path.exists(docs_dir):
             return ""
         try:
-            with open(rules_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            # Thu thập toàn bộ nội dung từ các file *.txt trong docs/
+            all_contents = []
+            for file_name in os.listdir(docs_dir):
+                if file_name.endswith(".txt"):
+                    file_path = os.path.join(docs_dir, file_name)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            all_contents.append(f.read())
+                    except Exception as fe:
+                        print(f"[RAG] Loi khi doc file {file_name}: {fe}")
+            
+            if not all_contents:
+                return ""
+            
+            content = "\n\n".join(all_contents)
             
             # Chia nhỏ theo tiêu đề phần (Markdown headers)
             sections = content.split("\n## ")
@@ -173,13 +186,13 @@ class AIChatbot(commands.Cog):
     # ------------------------------------------------------------------
     # DB: Lưu thống kê token sử dụng
     # ------------------------------------------------------------------
-    def _save_token_usage_to_db(self, guild_id: int, user_id: int, prompt_tokens: int, completion_tokens: int, total_tokens: int):
+    def _save_token_usage_to_db(self, guild_id: int, user_id: int, prompt_tokens: int, completion_tokens: int, total_tokens: int, latency_ms: int = 0):
         try:
             with db_lock:
                 cursor.execute(
-                    "INSERT INTO ai_token_usage (guild_id, user_id, prompt_tokens, completion_tokens, total_tokens, timestamp) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (str(guild_id), str(user_id), prompt_tokens, completion_tokens, total_tokens, time.time())
+                    "INSERT INTO ai_token_usage (guild_id, user_id, prompt_tokens, completion_tokens, total_tokens, timestamp, latency_ms) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (str(guild_id), str(user_id), prompt_tokens, completion_tokens, total_tokens, time.time(), latency_ms)
                 )
                 conn.commit()
         except Exception as e:
@@ -303,11 +316,23 @@ class AIChatbot(commands.Cog):
                 else:
                     prompt_with_rag = content
 
+                start_time = time.time()
                 if image_target:
                     # Đọc và phân tích ảnh với Gemini Vision
                     image_bytes = await image_target.read()
                     image_pil = PIL.Image.open(io.BytesIO(image_bytes))
-                    prompt = prompt_with_rag if content else "Hãy phân tích hình ảnh này dựa trên các quy định của server."
+                    
+                    safety_prompt_prefix = (
+                        "Bạn là một hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
+                        "BƯỚC 1: Hãy kiểm tra kỹ xem hình ảnh đính kèm có vi phạm các tiêu chuẩn an toàn sau không:\n"
+                        "- Chứa nội dung nhạy cảm, người lớn (NSFW), khỏa thân, hoặc thô tục.\n"
+                        "- Chứa nội dung bạo lực ghê rợn, máu me, tự hại.\n"
+                        "- Chứa logo, watermark có bản quyền sở hữu trí tuệ hoặc thương hiệu thương mại lớn được bảo hộ nghiêm ngặt.\n\n"
+                        "Nếu phát hiện có vi phạm ở BƯỚC 1, bạn bắt buộc BẮT ĐẦU phản hồi chính xác bằng câu thông báo sau đây và KHÔNG giải thích gì thêm:\n"
+                        "\"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n\n"
+                        "BƯỚC 2: Nếu hình ảnh AN TOÀN, hãy trả lời bình thường bằng tiếng Việt tự nhiên và thực hiện yêu cầu của người dùng sau: "
+                    )
+                    prompt = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này dựa trên các quy định của server.'}"
                     
                     # Lưu tin nhắn user vào DB (chỉ lưu tin nhắn gốc)
                     self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
@@ -331,6 +356,8 @@ class AIChatbot(commands.Cog):
                     )
                     reply_text = response.text
 
+                latency_ms = int((time.time() - start_time) * 1000)
+
                 # Ghi nhận thống kê token sử dụng vào DB
                 prompt_tokens = 0
                 completion_tokens = 0
@@ -339,7 +366,7 @@ class AIChatbot(commands.Cog):
                     prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
                     completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
                     total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
-                self._save_token_usage_to_db(guild_id, user_id, prompt_tokens, completion_tokens, total_tokens)
+                self._save_token_usage_to_db(guild_id, user_id, prompt_tokens, completion_tokens, total_tokens, latency_ms)
 
                 # Lưu phản hồi của model vào DB
                 self._save_message_to_db(guild_id, user_id, "model", reply_text)

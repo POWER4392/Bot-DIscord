@@ -1181,3 +1181,67 @@ textarea.form-control {
     font-weight: 700;
     color: var(--text-highlight);
 }
+
+/* ================================================================
+   REACTION ROLES LIST CUSTOM STYLES (Sprint 5.1 Enhancement)
+   ================================================================ */
+.rr-panels-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.rr-panel-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-speed);
+}
+
+.rr-panel-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.rr-panel-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rr-panel-id {
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    color: var(--text-highlight);
+    font-weight: 600;
+}
+
+.rr-panel-guild {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.rr-panel-roles {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.rr-panel-role-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(88, 101, 242, 0.12);
+    border: 1px solid rgba(88, 101, 242, 0.22);
+    color: #A0B5FF;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+

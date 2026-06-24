@@ -5,6 +5,7 @@ from aiohttp import web
 from core.shared import config, API_SECRET
 from core.database import cursor, conn, db_lock
 import os
+import asyncio
 
 # ---------------------------------------------------------------------------
 # Rate Limiting (Fix #34 - Viet QA/Security)
@@ -324,6 +325,19 @@ def create_handle_api(bot):
                     metrics["ai_total_prompt_tokens"] = token_row[0] or 0 if token_row else 0
                     metrics["ai_total_completion_tokens"] = token_row[1] or 0 if token_row else 0
                     metrics["ai_total_tokens"] = token_row[2] or 0 if token_row else 0
+
+                    # Lịch sử 15 lần sử dụng token gần nhất để vẽ biểu đồ
+                    cursor.execute("SELECT prompt_tokens, completion_tokens, total_tokens, timestamp, latency_ms FROM ai_token_usage ORDER BY timestamp ASC LIMIT 15")
+                    history_rows = cursor.fetchall()
+                    metrics["token_history"] = [
+                        {
+                            "prompt_tokens": r[0],
+                            "completion_tokens": r[1],
+                            "total_tokens": r[2],
+                            "timestamp": r[3],
+                            "latency_ms": r[4]
+                        } for r in history_rows
+                    ]
                 return web.json_response(metrics)
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
@@ -383,6 +397,57 @@ def create_handle_api(bot):
                     return web.json_response({"ok": True, "msg": f"'{word}' đã được xóa khỏi blacklist."})
                 else:
                     return web.json_response({"ok": False, "error": f"'{word}' không có trong blacklist."})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "GET_REACTION_ROLES":
+            def get_panels():
+                with db_lock:
+                    cursor.execute("SELECT message_id, guild_id, roles_json FROM reaction_panels")
+                    return cursor.fetchall()
+            try:
+                rows = await asyncio.to_thread(get_panels)
+                panels = []
+                for row in rows:
+                    panels.append({
+                        "message_id": row[0],
+                        "guild_id": row[1],
+                        "roles": json.loads(row[2]) if row[2] else []
+                    })
+                return web.json_response({"ok": True, "panels": panels})
+            except Exception as e:
+                return web.json_response({"ok": False, "error": str(e)})
+
+        elif action == "DELETE_REACTION_ROLE":
+            if auth != API_SECRET:
+                return web.json_response({"ok": False, "error": "Unauthorized"}, status=403)
+            payload = data.get("payload", {})
+            message_id = payload.get("message_id", "")
+            if not message_id:
+                return web.json_response({"ok": False, "error": "Thiếu message_id"})
+            
+            def delete_panel():
+                with db_lock:
+                    cursor.execute("DELETE FROM reaction_panels WHERE message_id=?", (str(message_id),))
+                    conn.commit()
+                    return cursor.rowcount
+
+            try:
+                deleted = await asyncio.to_thread(delete_panel)
+                
+                async def delete_discord_message(msg_id):
+                    for guild in bot.guilds:
+                        for channel in guild.text_channels:
+                            try:
+                                msg = await channel.fetch_message(int(msg_id))
+                                await msg.delete()
+                                print(f"[Reaction Role] Da xoa tin nhan {msg_id} tren Discord.")
+                                return
+                            except Exception:
+                                continue
+                
+                bot.loop.create_task(delete_discord_message(message_id))
+                return web.json_response({"ok": True, "msg": f"Đã xóa Reaction Role panel {message_id}"})
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
 

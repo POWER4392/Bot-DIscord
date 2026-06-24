@@ -1,4 +1,4 @@
-# Bao cao Quan tri Du an & Lot trinh Sprint - Tuan 4
+# Bao cao Quan tri Du an & Lot trinh Sprint - Tuan 5
 
 Bao cao duoc thuc hien boi **Do Hoang Long (Project Manager & DevOps Specialist)**.
 
@@ -11,7 +11,7 @@ Du an phat trien he thong Discord Bot duoc van hanh theo quy trinh Agile/Scrum v
 * **QA & Security Analyst:** Mai Van Viet (`vanviet2k6-creator`) - Kiem thu QA va danh gia bao mat.
 
 ## 2. Ke hoach va Phan cong cac Sprint (Sprint Backlog & Assignees)
-Du an chia lam 4 Sprint chinh thuc voi phan cong nhiem vu chi tiet nhu sau:
+Du an chia lam 5 Sprint chinh thuc voi phan cong nhiem vu chi tiet nhu sau:
 
 * **Sprint 1 (Tuan 1):** Phan tich yeu cau, khoi tao repository va cau truc DB SQLite.
   * **Tran Duc Manh:** Khoi tao main core bot, event handler va setup database connection class.
@@ -40,6 +40,20 @@ Du an chia lam 4 Sprint chinh thuc voi phan cong nhiem vu chi tiet nhu sau:
   * **Do Hoang Long (Issue #33):** Health monitoring check endpoint `/health`, devops uptime check.
   * **Mai Van Viet (Issue #34):** Trien khai CORS middleware, rate limiter, security audit.
   * **Nguyen Duc Duy (Issue #35):** AI Vision, database token stats counter analytics.
+
+* **Sprint 5.1 (Tuan 5 - Phan 1):** Nang cap AI Vision, RAG, Web Dashboard analytics & CI/CD workflow.
+  * **Nguyen Duc Duy (Issue #42):** Nang cap AI Vision, basic RAG, lay token usage counter.
+  * **Tran Duc Manh (Issue #43):** Toi uu database pool, WAL mode, API endpoint cho reaction roles.
+  * **Mai Van Viet (Issue #44):** Thiet lap integration tests, stress test va load tests.
+  * **Tong Xuan Nghia (Issue #45):** Giao dien Web Dashboard dynamic voi Chart.js ve token stats va danh sach Reaction Roles.
+  * **Do Hoang Long (Issue #46):** Setup CI/CD workflow, auto deploy len Render Cloud.
+
+* **Sprint 5.2 (Tuan 5 - Phan 2):** Kiem thu tong the, sua loi, hoan thien tai lieu SDD va phat hanh Release 0.1.0.
+  * **Tran Duc Manh (Issue #51):** Sua cac loi ve DB lock, review va merge code tu cac nhanh tinh nang.
+  * **Do Hoang Long (Issue #52):** Hop nhat code on dinh vao nhanh `main`, gan tag release `v0.1.0`, verify he thong tren Render Cloud.
+  * **Nguyen Duc Duy (Issue #53):** Kiem tra an toan token Gemini, error handling cho AI Vision.
+  * **Tong Xuan Nghia (Issue #54):** Hoan thien tai lieu dac ta Use Case va standardizing diagrams trong SDD.md.
+  * **Mai Van Viet (Issue #55):** Kiem thu dong goi load_test tren cloud, ky duyet release chat luong bot truoc khi ban giao.
 
 ## 3. Bang quan ly rui ro (Risk Management Matrix)
 | Rui ro | Muc do anh huong | Ke hoach khac phuc |
