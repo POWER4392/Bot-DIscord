@@ -10,7 +10,7 @@
 | **Ngôn ngữ** | Python 3.x |
 | **Thư viện chính** | discord.py, aiohttp, yt-dlp, Pillow, SQLite/PostgreSQL |
 | **Nền tảng** | Discord API |
-| **Thành viên nhóm** | - **Trần Đức Mạnh** (Backend Developer)<br>- **Đỗ Hoàng Long** (DevOps & PM)<br>- **Mai Văn Việt** (QA & Security)<br>- **Tống Xuân Nghĩa** (UI/UX & Content)<br>- **Nguyễn Đức Duy** (AI/ML & Features) |
+| **Thành viên nhóm** | - **Trần Đức Mạnh** (`POWER4392`) - Backend Developer<br>- **Đỗ Hoàng Long** (`Long432`) - DevOps & PM<br>- **Mai Văn Việt** (`vanviet2k6-creator`) - QA & Security<br>- **Tống Xuân Nghĩa** (`hendrix810`) - UI/UX & Content<br>- **Nguyễn Đức Duy** (`duynguyen1012`) - AI/ML & Features |
 
 ---
 
@@ -32,32 +32,32 @@ Discord là nền tảng giao tiếp trực tuyến phổ biến với hàng tri
 
 Dự án được thực hiện bởi nhóm gồm 5 thành viên với vai trò và nhiệm vụ cụ thể như sau:
 
-1. **Trần Đức Mạnh – Backend Developer (Lập trình cốt lõi Backend):**
+1. **Trần Đức Mạnh** (`POWER4392`) **– Backend Developer (Lập trình cốt lõi Backend):**
    - Thiết kế kiến trúc Bot (Main Core, Command & Event Handler).
    - Lập trình các tính năng/Cogs cốt lõi (như Moderation, Utilities, Music Player).
    - Xây dựng lớp trừu tượng cơ sở dữ liệu (`core/database.py` hỗ trợ SQLite & PostgreSQL).
    - Thiết lập API HTTP nội bộ (IPC server) để kết nối giữa GUI và Bot.
    - Bàn giao mã nguồn hoàn chỉnh cho thành viên kiểm thử và triển khai.
 
-2. **Đỗ Hoàng Long – DevOps & Cloud Deployment (Triển khai & Quản trị dự án):**
+2. **Đỗ Hoàng Long** (`Long432`) **– DevOps & Cloud Deployment (Triển khai & Quản trị dự án):**
    - Trưởng nhóm, quản trị tiến độ dự án và điều phối công việc giữa các thành viên.
    - Nghiên cứu giải pháp, cấu hình môi trường và triển khai bot lên Render Cloud Hosting.
    - Quản trị cơ sở dữ liệu đám mây Neon Serverless PostgreSQL.
    - Thiết lập UptimeRobot để giám sát Uptime 24/7 và viết tài liệu báo cáo dự án (`BAO_CAO_CNPM.md`).
 
-3. **Mai Văn Việt – QA & Security Engineer (Kiểm thử & Bảo mật):**
+3. **Mai Văn Việt** (`vanviet2k6-creator`) **– QA & Security Engineer (Kiểm thử & Bảo mật):**
    - Lập kịch bản kiểm thử (Test Cases) chi tiết cho từng tính năng của bot.
    - Chạy thử nghiệm local và cloud (Black-box & White-box testing) để tìm và ghi nhận log lỗi.
    - Đảm bảo an toàn bảo mật thông tin, quản lý file cấu hình `.env`, `config.json` và `config.example.json`.
    - Kiểm thử chịu tải hệ thống (anti-spam, anti-nuke).
 
-4. **Tống Xuân Nghĩa – UI/UX & Content Designer (Thiết kế Giao diện & Nội dung):**
+4. **Tống Xuân Nghĩa** (`hendrix810`) **– UI/UX & Content Designer (Thiết kế Giao diện & Nội dung):**
    - Thiết kế giao diện GUI điều khiển Desktop (`setting_gui.py`) bằng `customtkinter`.
    - Phác thảo giao diện Web Dashboard quản lý bot (định hướng tuần kế tiếp).
    - Thiết kế trải nghiệm hiển thị trên Discord: định dạng các tin nhắn nhúng (Embeds), nút bấm (Buttons), thanh chọn (Select Menus) của bot để tăng tính thẩm mỹ và thân thiện với người dùng.
    - Hỗ trợ biên soạn bộ câu lệnh mẫu và tài liệu phản hồi của Bot.
 
-5. **Nguyễn Đức Duy – AI/ML & Feature Integration Engineer (Tích hợp AI & Tính năng mở rộng):**
+5. **Nguyễn Đức Duy** (`duynguyen1012`) **– AI/ML & Feature Integration Engineer (Tích hợp AI & Tính năng mở rộng):**
    - Xây dựng thuật toán kiểm duyệt nội dung tự động nâng cao (Regex scam detection, Sliding Window anti-spam).
    - Thiết lập hệ thống Crawl tin tức tự động (`cogs/social.py`) từ YouTube, TikTok, Reddit.
    - Lập trình hệ thống tích hợp XP & Cấp độ và thuật toán Gamification (`cogs/economy.py`).
