@@ -460,7 +460,7 @@ graph TD
 
 ```
 
-**► [CHÈN HÌNH ẢNH: usecase_diagram.png VÀO ĐÂY]**
+![Sơ đồ Use Case tổng quan](images/usecase_diagram.png)
 
 ### 3.4. Đặc tả các ca sử dụng chi tiết
 
@@ -577,90 +577,34 @@ Các biểu đồ hoạt động dưới đây được chuẩn hóa theo địn
 Biểu đồ mô tả quy trình tiếp nhận tin nhắn và phân tích qua các bộ lọc vi phạm:
 
 ```mermaid
-
 %%{init: {'theme': 'neutral'}}%%
-
-stateDiagram-v2
-
-    [*] --> RecvMsg : Tiếp nhận tin nhắn (on_message)
-
-    RecvMsg --> CheckAuthor : Tin nhắn từ Bot hoặc Admin?
-
-    CheckAuthor --> [*] : Đúng (Bỏ qua)
-
-    CheckAuthor --> FilterScam : Sai
-
+flowchart TD
+    Start([Bắt đầu]) --> RecvMsg[Tiếp nhận tin nhắn on_message]
     
+    subgraph UC01[UC01: Luồng Kiểm Duyệt Tự Động AutoMod]
+        RecvMsg --> CheckAuthor{Tin nhắn từ<br>Bot hoặc Admin?}
+        
+        CheckAuthor -- Đúng --> Ignore[Bỏ qua tin nhắn]
+        CheckAuthor -- Sai --> FilterScam{1. Quét Scam Link<br>khớp SCAM_REGEX?}
+        
+        FilterScam -- Đúng --> ActionScam[Xóa tin + Timeout 1 giờ<br>+ Ghi log vi phạm vào DB]
+        FilterScam -- Sai --> FilterSpam{2. Quét Spam<br>tin > 5 / 3.5 giây?}
+        
+        FilterSpam -- Đúng --> ActionSpam[Xóa các tin spam<br>+ Timeout 5 phút + Ghi log DB]
+        FilterSpam -- Sai --> FilterBlacklist{3. Quét Blacklist<br>trùng từ cấm trong DB?}
+        
+        FilterBlacklist -- Đúng --> ActionWord[Xóa tin + Cảnh cáo<br>+ Ghi log vi phạm vào DB]
+        FilterBlacklist -- Sai --> NormalProcess[Xử lý tin nhắn bình thường<br>nhận XP, chat AI, v.v.]
+    end
 
-    state FilterScam {
-
-        [*] --> MatchRegex : Quét qua SCAM_REGEX
-
-        MatchRegex --> ScamFound : Khớp link lừa đảo
-
-        MatchRegex --> CleanScam : Không khớp
-
-    }
-
-    
-
-    ScamFound --> ActionScam : Xóa tin + Timeout 1 giờ + Lưu log DB
-
-    ActionScam --> [*]
-
-    
-
-    CleanScam --> FilterSpam : Tiếp tục lọc
-
-    
-
-    state FilterSpam {
-
-        [*] --> SlidingWindow : Tính tần suất tin (3.5 giây gần nhất)
-
-        SlidingWindow --> SpamFound : Số tin > 5
-
-        SlidingWindow --> CleanSpam : Số tin <= 5
-
-    }
-
-    
-
-    SpamFound --> ActionSpam : Xóa các tin spam + Timeout 5 phút + Lưu log DB
-
-    ActionSpam --> [*]
-
-    
-
-    CleanSpam --> FilterBlacklist : Tiếp tục lọc
-
-    
-
-    state FilterBlacklist {
-
-        [*] --> CheckDB : Đối chiếu từ cấm trong DB
-
-        CheckDB --> WordFound : Trùng từ blacklist
-
-        CheckDB --> CleanWord : Hợp lệ
-
-    }
-
-    
-
-    WordFound --> ActionWord : Xóa tin + Cảnh cáo thành viên + Lưu log DB
-
-    ActionWord --> [*]
-
-    
-
-    CleanWord --> NormalProcess : Xử lý bình thường
-
-    NormalProcess --> [*]
-
+    Ignore --> End([Kết thúc])
+    ActionScam --> End
+    ActionSpam --> End
+    ActionWord --> End
+    NormalProcess --> End
 ```
 
-**► [CHÈN HÌNH ẢNH: flowchart_automod.png VÀO ĐÂY]**
+![Biểu đồ hoạt động AutoMod](images/flowchart_automod.png)
 
 #### 3.5.2. Luồng Phát nhạc YouTube
 
@@ -714,7 +658,7 @@ stateDiagram-v2
 
 ```
 
-**► [CHÈN HÌNH ẢNH: flowchart_music.png VÀO ĐÂY]**
+![Biểu đồ hoạt động Music](images/flowchart_music.png)
 
 #### 3.5.3. Luồng Xử lý AI Chatbot & Logging Token
 
@@ -760,7 +704,7 @@ stateDiagram-v2
 
 ```
 
-**► [CHÈN HÌNH ẢNH: flowchart_ai_chat.png VÀO ĐÂY]**
+![Biểu đồ hoạt động AI Chatbot](images/flowchart_ai_chat.png)
 
 #### 3.5.4. Luồng Hệ thống Vé Hỗ Trợ (Ticket System)
 
@@ -1436,7 +1380,7 @@ classDiagram
 
 ```
 
-**► [CHÈN HÌNH ẢNH: class_diagram_cog.png VÀO ĐÂY]**
+![Sơ đồ lớp Cogs & Services](images/class_diagram_cog.png)
 
 - **Mô tả cấu trúc lớp tổng thể:**
 
@@ -1532,7 +1476,7 @@ sequenceDiagram
 
 ```
 
-**► [CHÈN HÌNH ẢNH: sequence_diagram_play.png VÀO ĐÂY]**
+![Biểu đồ tuần tự /play](images/sequence_diagram_play.png)
 
 ##### 4.2.2.2. Luồng đàm thoại AI và lưu lịch sử (`/chat` hoặc tin nhắn kênh AI)
 
@@ -1928,7 +1872,7 @@ erDiagram
 
 ```
 
-**► [CHÈN HÌNH ẢNH: erd_diagram.png VÀO ĐÂY]**
+![Sơ đồ ERD](images/erd_diagram.png)
 
 ---
 
