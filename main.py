@@ -1,19 +1,30 @@
+import sys
+
+# Configure stdout and stderr to use UTF-8 to prevent encoding errors on non-UTF-8 terminals
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='ignore')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='ignore')
+
 import discord
 from discord.ext import commands, tasks
 import asyncio
 import json
 import datetime
 import os
-import sys
 
-from core.shared import config, api_server_started
-from core.database import cursor, conn, db_lock
-from core.api_server import start_api_server
-import os
-
-# Import Views for Persistent adding
-from cogs.music import MusicControlView
-from cogs.utilities import TicketView, TicketControlView, VoiceGeneratorView, PersistentRoleView
+try:
+    from core.shared import config, api_server_started
+    from core.database import cursor, conn, db_lock
+    from core.api_server import start_api_server
+    # Import Views for Persistent adding
+    from cogs.music import MusicControlView
+    from cogs.utilities import TicketView, TicketControlView, VoiceGeneratorView, PersistentRoleView
+except Exception as e:
+    import traceback
+    print(f"❌ CRITICAL STARTUP ERROR (Import Failure): {e}")
+    traceback.print_exc()
+    sys.exit(1)
 
 intents = discord.Intents.default()
 intents.message_content = True

@@ -4,8 +4,22 @@ import psycopg2
 from psycopg2 import pool
 from core.shared import db_lock, DB_URL, USE_PG
 
+import time
+
 if USE_PG:
-    db_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DB_URL)
+    db_pool = None
+    for attempt in range(5):
+        try:
+            db_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DB_URL)
+            print(f"[DATABASE] Connected to PostgreSQL (Neon) successfully on attempt {attempt+1}.")
+            break
+        except Exception as e:
+            print(f"[DATABASE WARNING] Attempt {attempt+1}/5 to connect to database failed: {e}")
+            if attempt < 4:
+                time.sleep(3)
+            else:
+                print("[DATABASE ERROR] Could not connect to PostgreSQL after 5 attempts.")
+                raise e
     
     class CloudDBCursor:
         def __init__(self):
