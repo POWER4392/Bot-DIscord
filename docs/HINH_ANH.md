@@ -3,7 +3,14 @@
 
 Tài liệu này lưu trữ tất cả các hình ảnh sơ đồ thiết kế hệ thống dưới dạng tệp tin ảnh PNG. **Toàn bộ hình ảnh đã được xử lý về định dạng đơn sắc (grayscale/không màu) để phục vụ cho việc chèn vào báo cáo Word/docx môn học.**
 
-### 1. Sơ đồ Use Case Tổng Quan
+### 1. Sơ đồ Kiến trúc Hệ thống (High-Level Architecture)
+- **Tên tệp:** `architecture_diagram.png`
+- **Đường dẫn tệp:** [architecture_diagram.png](file:///d:/Code/Bot/docs/images/architecture_diagram.png)
+- **Mô tả:** Sơ đồ khối tổng quan 4 tầng: Web Dashboard → API Server Engine → Discord Bot Core → (Cogs Modules / Database / Gemini AI API).
+
+---
+
+### 2. Sơ đồ Use Case Tổng Quan
 - **Tên tệp:** `usecase_diagram.png`
 - **Đường dẫn tệp:** [usecase_diagram.png](file:///d:/Code/Bot/docs/images/usecase_diagram.png)
 - **Mô tả:** Biểu diễn các tác nhân (Member, Admin/Mod, System Bot) và 11 ca sử dụng chính của hệ thống.

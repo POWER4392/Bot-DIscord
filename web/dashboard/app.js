@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let isMockMode = false;
     let serverData = {}; // Store retrieved roles and channels
     let globalConfig = {};
+    const API_TIMEOUT_MS = 8000; // 8 giây timeout
 
     // Load saved settings from LocalStorage
     if (localStorage.getItem("bot_api_host")) {
@@ -144,33 +145,56 @@ document.addEventListener("DOMContentLoaded", () => {
         const host = apiHostInput.value.trim().replace(/\/$/, "");
         const apiKey = apiKeyInput.value.trim();
 
+        if (!host) {
+            throw new Error("Vui lòng nhập địa chỉ API Server (ví dụ: http://localhost:8080)");
+        }
+        if (!apiKey) {
+            throw new Error("Vui lòng nhập API Secret Key trước khi kết nối.");
+        }
+
         // Save to localstorage
         localStorage.setItem("bot_api_host", host);
         localStorage.setItem("bot_api_key", apiKey);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
         try {
             const response = await fetch(`${host}/api`, {
                 method: "POST",
+                mode: "cors",
                 headers: {
                     "Content-Type": "application/json",
                     "X-API-Key": apiKey
                 },
-                body: JSON.stringify({ action, payload })
+                body: JSON.stringify({ action, payload }),
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    throw new Error("Không có quyền truy cập (API Key không hợp lệ).");
+                    throw new Error("API Key không hợp lệ (401 Unauthorized). Kiểm tra lại Key trong .env → API_SECRET.");
                 }
                 if (response.status === 403) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || "Bị từ chối quyền.");
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || "Bị từ chối quyền (403 Forbidden).");
                 }
-                throw new Error(`Lỗi kết nối Server (${response.status})`);
+                if (response.status === 429) {
+                    throw new Error("Quá nhiều yêu cầu (429). Vui lòng thử lại sau 60 giây.");
+                }
+                throw new Error(`Lỗi kết nối Server (HTTP ${response.status})`);
             }
 
             return await response.json();
         } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === "AbortError") {
+                throw new Error(`Timeout (${API_TIMEOUT_MS / 1000}s): Không thể kết nối đến ${host}. Kiểm tra bot đang chạy và port ${host.split(":").pop()} đang mở.`);
+            }
+            if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError") || error.message.includes("CORS")) {
+                throw new Error(`Không thể kết nối đến ${host}.\n→ Đảm bảo bot đang chạy\n→ Mở đúng port (mặc định 8080)\n→ Nếu dùng Render: nhập URL https://... chứ không phải localhost`);
+            }
             console.error(`API Error on ${action}:`, error);
             throw error;
         }
@@ -483,10 +507,12 @@ document.addEventListener("DOMContentLoaded", () => {
             // Fallback to Mock Data (Demo Mode)
             isMockMode = true;
             connectionProgress.style.width = "100%";
-            apiStatusText.textContent = "Chế độ Demo";
+            apiStatusText.textContent = "Mất kết nối";
             apiStatusText.className = "status-indicator-text offline";
-            
-            showToast(error.message || "Không thể kết nối đến Bot API. Chuyển sang chế độ Demo.", "error");
+
+            const errMsg = error.message || "Không thể kết nối đến Bot API.";
+            showToast(`⚠️ ${errMsg}`, "error");
+            console.warn("[Dashboard] Kết nối thất bại, chuyển sang chế độ Demo.", error);
             loadMockData();
         }
     };
@@ -520,96 +546,50 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
-    // Load beautiful realistic mock data for presentation
+    // Load mock data khi bot offline — hiển thị trạng thái rỗng thay vì dữ liệu giả
     const loadMockData = () => {
-        statServers.textContent = "3";
-        statUsers.textContent = "1,420";
-        statPing.textContent = "42 ms";
-        statVoice.textContent = "5";
+        // Hiển thị trạng thái chờ kết nối thay vì số liệu giả
+        statServers.textContent = "-";
+        statUsers.textContent = "-";
+        statPing.textContent = "-";
+        statVoice.textContent = "-";
 
-        cogsList.innerHTML = "";
-        const mockCogs = ["music", "moderation", "economy", "utilities", "social", "welcome", "ai_chatbot"];
-        mockCogs.forEach(cog => {
-            const badge = document.createElement("span");
-            badge.className = "badge";
-            badge.textContent = cog;
-            cogsList.appendChild(badge);
-        });
+        cogsList.innerHTML = '<span class="badge badge-loading">Bot chưa kết nối</span>';
 
-        infoUsername.textContent = "CyberBot#9999";
-        infoId.textContent = "987654321012345678";
+        infoUsername.textContent = "Chưa kết nối";
+        infoId.textContent = "-";
 
-        // Mock settings config
+        // Reset config về giá trị mặc định
         globalConfig = {
             prefix: "!",
             api_port: 8080,
-            api_secrets: ["changeme123"],
-            welcome_channel_id: "111222333444555",
-            ai_channel_id: "122333444555666",
-            ai_system_prompt: "Bạn là một trợ lý ảo Discord thân thiện, hòa đồng, đại diện cho nhóm Công Nghệ Phần Mềm."
+            api_secrets: [],
+            ai_channel_id: "",
+            ai_system_prompt: ""
         };
 
         sysPrefixInput.value = globalConfig.prefix;
         sysApiPortInput.value = globalConfig.api_port;
         sysJsonTextarea.value = JSON.stringify(globalConfig, null, 4);
-        aiSystemPrompt.value = globalConfig.ai_system_prompt;
-        aiApiStatusBadge.innerHTML = '<span class="status-badge online"><span class="dot"></span> Đã cấu hình API Key (Demo)</span>';
+        aiSystemPrompt.value = "";
+        aiApiStatusBadge.innerHTML = '<span class="status-badge offline"><span class="dot"></span> Chưa kết nối</span>';
 
-        // Mock Server list
-        serverData = {
-            "111222333": {
-                name: "CS - Công Nghệ Phần Mềm",
-                roles: [
-                    { id: "101", name: "Ban Cán Sự Class" },
-                    { id: "102", name: "Thành viên nhóm" },
-                    { id: "103", name: "Lớp Trưởng" }
-                ],
-                channels: [
-                    { id: "122333444555666", name: "general-chat" },
-                    { id: "202", name: "thảo-luận-nhóm" },
-                    { id: "203", name: "bot-commands" }
-                ]
-            },
-            "444555666": {
-                name: "Gaming Server",
-                roles: [
-                    { id: "301", name: "Gamer" },
-                    { id: "302", name: "Streamer" }
-                ],
-                channels: [
-                    { id: "401", name: "public-chat" },
-                    { id: "402", name: "voice-room-1" }
-                ]
-            }
-        };
-
+        // Không có server data
+        serverData = {};
         populateDropdowns();
-        aiChannelSelect.value = globalConfig.ai_channel_id;
-        
-        // Mock token statistics (Issue #35 - Duy AI/ML)
+
+        // Token stats: reset về 0
         const promptVal = document.getElementById("ai-prompt-tokens");
         const completionVal = document.getElementById("ai-completion-tokens");
         const totalVal = document.getElementById("ai-total-tokens");
-        if (promptVal) promptVal.textContent = "124,530";
-        if (completionVal) completionVal.textContent = "85,240";
-        if (totalVal) totalVal.textContent = "209,770";
+        if (promptVal) promptVal.textContent = "0";
+        if (completionVal) completionVal.textContent = "0";
+        if (totalVal) totalVal.textContent = "0";
 
-        // Mock token chart history
-        const now = Math.floor(Date.now() / 1000);
-        const mockChartHistory = [];
-        for (let i = 14; i >= 0; i--) {
-            const promptTk = Math.floor(5000 + Math.random() * 8000);
-            const complTk = Math.floor(3000 + Math.random() * 5000);
-            mockChartHistory.push({
-                prompt_tokens: promptTk,
-                completion_tokens: complTk,
-                latency_ms: Math.floor(100 + Math.random() * 300),
-                timestamp: now - i * 60
-            });
-        }
-        initOrUpdateTokenChart(mockChartHistory);
+        // Hiển thị chart trống
+        initOrUpdateTokenChart([{ prompt_tokens: 0, completion_tokens: 0, latency_ms: 0 }]);
 
-        // Load Reaction Roles
+        // Load Reaction Roles (sẽ hiển thị lỗi kết nối)
         loadReactionRoles();
     };
 
@@ -788,9 +768,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initialize Page
     loadDashboardData();
 
-    // Add initial rows to Reaction Role builder
-    addRoleRow("Ban Cán Sự Class", "Nhận thông báo đặc biệt và quản lý lớp học");
-    addRoleRow("Thành viên nhóm", "Hợp tác làm dự án Công Nghệ Phần Mềm");
+    // Không pre-fill dữ liệu demo vào form Reaction Roles
+    // (người dùng tự thêm Role sau khi kết nối bot)
 
     // ================================================================
     // 8. QA & SECURITY TAB — (Đề cao cho Nghĩa - tích hợp fix Long & Viet)
@@ -875,15 +854,16 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
         } catch (err) {
-            // Fallback mock data in demo mode
-            qaUptime.textContent      = "02h 14m 37s";
-            qaDbType.textContent      = "SQLite (Local Demo)";
-            qaEnvironment.textContent = "🖥️ Development";
+            // Bot offline: hiển thị trạng thái không kết nối được
+            qaUptime.textContent      = "-";
+            qaDbType.textContent      = "-";
+            qaEnvironment.textContent = "-";
 
             healthMonitor.innerHTML = `
                 <div class="checklist-placeholder">
                     <i data-lucide="wifi-off"></i>
-                    <p>Không thể kết nối /health endpoint.<br>Đang hiển thị dữ liệu Demo.</p>
+                    <p>Không thể kết nối đến <code>${apiHostInput.value.trim() || 'API Server'}</code>.<br>
+                    Đảm bảo bot đang chạy và nhập đúng địa chỉ.</p>
                 </div>
             `;
             lucide.createIcons();

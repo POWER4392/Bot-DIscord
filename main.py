@@ -32,7 +32,10 @@ intents.members = True
 intents.voice_states = True
 intents.presences = True
 
-bot = commands.Bot(command_prefix=config.get("prefix", "!"), intents=intents)
+proxy = os.environ.get("DISCORD_PROXY") or config.get("proxy")
+if not proxy:
+    proxy = None
+bot = commands.Bot(command_prefix=config.get("prefix", "!"), intents=intents, proxy=proxy)
 bot.remove_command('help')
 
 async def export_server_data():
@@ -166,13 +169,7 @@ bot.setup_hook = setup_hook
 
 @bot.event
 async def on_ready():
-    global api_server_started
     print(f'[THONG BAO] Bot {bot.user} da Started thanh cong!')
-    
-    if not api_server_started:
-        bot.loop.create_task(start_api_server(bot))
-        from core import shared
-        shared.api_server_started = True
 
     if not check_timed_roles.is_running():
         check_timed_roles.start()
@@ -202,14 +199,45 @@ async def on_command_error(ctx, error):
         return
     print(f"[LOI LENH] {error}")
 
-if __name__ == "__main__":
-    # Uu tien doc token tu bien moi truong (an toan hon config.json)
+async def main():
+    # 1. Start HTTP API web server immediately to bind to the port (e.g. on Render)
+    import core.shared as shared
+    if not shared.api_server_started:
+        print("[THONG BAO] Dang khoi dong HTTP API server...")
+        asyncio.create_task(start_api_server(bot))
+        shared.api_server_started = True
+
+    # 2. Retrieve token
     token = os.environ.get("DISCORD_TOKEN") or config.get("token")
     if not token:
         print("[LOI] Chua cau hinh DISCORD_TOKEN trong .env hoac config.json!")
         sys.exit(1)
 
+    # 3. Connect bot with retry loop and exponential backoff
+    retry_delay = 5
+    while True:
+        try:
+            print("[THONG BAO] Dang ket noi den Discord API...")
+            await bot.start(token)
+            break
+        except discord.errors.HTTPException as e:
+            if e.status == 429:
+                print(f"[LOI REST/GATEWAY] 429 Too Many Requests tu Discord. Thu lai sau {retry_delay} giay. Chi tiet: {e}")
+            else:
+                print(f"[LOI REST/GATEWAY] HTTP error: {e}. Thu lai sau {retry_delay} giay.")
+        except Exception as e:
+            print(f"[LOI BAT THUONG] {e}. Thu lai sau {retry_delay} giay.")
+        
+        try:
+            await bot.close()
+        except Exception:
+            pass
+            
+        await asyncio.sleep(retry_delay)
+        retry_delay = min(retry_delay * 2, 300)
+
+if __name__ == "__main__":
     try:
-        bot.run(token)
-    except Exception as e:
-        print(f"[LOI] Khong the khoi chay Bot: {e}")
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("[THONG BAO] Bot duoc dung boi nguoi dung.")
