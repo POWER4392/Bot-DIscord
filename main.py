@@ -246,10 +246,16 @@ async def main():
             break
         except discord.errors.HTTPException as e:
             if e.status == 429:
-                # Ưu tiên dùng retry_after do Discord trả về, fallback về backoff
-                retry_after = getattr(e, "retry_after", None) or retry_delay
-                print(f"[LOI 429] Discord yeu cau cho {retry_after:.1f} giay truoc khi thu lai.")
-                await asyncio.sleep(retry_after)
+                # Discord trả về thời gian retry nếu là rate limit thông thường
+                # error code 0 là CloudFlare block — không có retry_after, dùng backoff
+                retry_after = getattr(e, "retry_after", None)
+                if retry_after and retry_after > 0:
+                    wait = retry_after
+                else:
+                    wait = retry_delay
+                print(f"[LOI 429] IP bi Discord block. Cho {wait:.0f} giay truoc khi thu lai. (lan {attempt})")
+                retry_delay = max(retry_delay, int(wait))
+                await asyncio.sleep(wait)
             else:
                 print(f"[LOI HTTP {e.status}] {e}. Thu lai sau {retry_delay} giay.")
                 await asyncio.sleep(retry_delay)
