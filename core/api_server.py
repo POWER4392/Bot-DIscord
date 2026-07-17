@@ -7,6 +7,7 @@ from core.database import cursor, conn, db_lock
 import os
 import asyncio
 import sqlite3
+import math
 
 # ---------------------------------------------------------------------------
 # Rate Limiting (Fix #34 - Viet QA/Security)
@@ -89,7 +90,7 @@ async def handle_health(request: web.Request):
         "bot_online": bot.is_ready(),
         "bot_user": str(bot.user) if bot.user else None,
         "guilds": len(bot.guilds),
-        "latency_ms": round(bot.latency * 1000) if bot.latency else 0,
+        "latency_ms": round(bot.latency * 1000) if bot.latency is not None and not math.isnan(bot.latency) else 0,
         "uptime": f"{hours:02d}h {minutes:02d}m {seconds:02d}s",
         "uptime_seconds": uptime_seconds,
         "loaded_cogs": list(bot.cogs.keys()),
@@ -163,7 +164,7 @@ def create_handle_api(bot):
                 "ok": True,
                 "bot_status": "Online",
                 "total_servers": len(bot.guilds),
-                "ping_ms": round(bot.latency * 1000) if bot.latency else 0,
+                "ping_ms": round(bot.latency * 1000) if bot.latency is not None and not math.isnan(bot.latency) else 0,
                 "loaded_cogs": list(bot.cogs.keys()),
                 "total_users": sum(len(g.members) for g in bot.guilds),
                 "active_voice_channels": len(bot.voice_clients)
@@ -210,7 +211,7 @@ def create_handle_api(bot):
                 "ok": True,
                 "bot": str(bot.user),
                 "guilds": len(bot.guilds),
-                "latency_ms": round(bot.latency * 1000) if bot.latency is not None else 0
+                "latency_ms": round(bot.latency * 1000) if bot.latency is not None and not math.isnan(bot.latency) else 0
             })
 
         elif action == "DB_QUERY":
@@ -303,7 +304,7 @@ def create_handle_api(bot):
                     "guilds": len(bot.guilds),
                     "total_members": sum(g.member_count or 0 for g in bot.guilds),
                     "voice_connections": len(bot.voice_clients),
-                    "latency_ms": round(bot.latency * 1000) if bot.latency else 0,
+                    "latency_ms": round(bot.latency * 1000) if bot.latency is not None and not math.isnan(bot.latency) else 0,
                     "loaded_cogs": list(bot.cogs.keys()),
                 }
                 # AI session stats
