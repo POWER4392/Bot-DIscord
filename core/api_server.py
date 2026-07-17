@@ -457,7 +457,10 @@ def create_handle_api(bot):
     return handle_api
 
 
+_app = None  # Module-level reference to the aiohttp app (used by main.py to update bot on reconnect)
+
 async def start_api_server(bot):
+    global _app
     app = web.Application(middlewares=[cors_middleware, rate_limit_middleware])
     app["bot"] = bot  # Store bot reference for health endpoint
     app.router.add_post("/api", create_handle_api(bot))
@@ -471,6 +474,7 @@ async def start_api_server(bot):
     site = web.TCPSite(runner, "0.0.0.0", port)
     try:
         await site.start()
+        _app = app  # Expose for bot reference update on reconnect
         print(f"[API] HTTP API server đang lắng nghe tại cổng {port}")
         print(f"[API] Health check: http://0.0.0.0:{port}/health")
     except OSError as e:
@@ -478,3 +482,4 @@ async def start_api_server(bot):
             print(f"❌ [API Error] Không thể mở cổng {port} vì đã bị chiếm dụng.")
         else:
             print(f"❌ [API Error] Lỗi khi khởi động server: {e}")
+

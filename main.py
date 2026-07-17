@@ -31,12 +31,25 @@ intents.message_content = True
 intents.members = True
 intents.voice_states = True
 intents.presences = True
+proxy = os.environ.get("DISCORD_PROXY") or config.get("proxy") or None
 
-proxy = os.environ.get("DISCORD_PROXY") or config.get("proxy")
-if not proxy:
-    proxy = None
-bot = commands.Bot(command_prefix=config.get("prefix", "!"), intents=intents, proxy=proxy)
-bot.remove_command('help')
+def create_bot():
+    """Tạo một Bot instance mới hoàn toàn (aiohttp session mới) để tránh lỗi 'Session is closed'."""
+    _intents = discord.Intents.default()
+    _intents.message_content = True
+    _intents.members = True
+    _intents.voice_states = True
+    _intents.presences = True
+    _bot = commands.Bot(
+        command_prefix=config.get("prefix", "!"),
+        intents=_intents,
+        proxy=proxy
+    )
+    _bot.remove_command('help')
+    return _bot
+
+# Bot instance được tạo ban đầu, sẽ được thay thế sau mỗi lần kết nối thất bại
+bot = create_bot()
 
 async def export_server_data():
     import core.shared as shared
@@ -137,103 +150,134 @@ async def check_gui_tasks():
                             conn.commit()
         except Exception as e: print(f"Lỗi IPC: {e}")
 
-async def setup_hook():
-    print("[THONG BAO] Đang tải các Cogs...")
-    await bot.load_extension("cogs.music")
-    await bot.load_extension("cogs.moderation")
-    await bot.load_extension("cogs.economy")
-    await bot.load_extension("cogs.utilities")
-    await bot.load_extension("cogs.social")
-    await bot.load_extension("cogs.welcome")
-    await bot.load_extension("cogs.ai_chatbot")
-    print("[THONG BAO] Đã tải xong Cogs.")
+def register_bot_events(b):
+    """Gắn toàn bộ events và setup_hook vào một bot instance."""
 
-    # Đăng ký các Persistent Views
-    bot.add_view(TicketView())
-    bot.add_view(TicketControlView())
-    bot.add_view(MusicControlView())
-    bot.add_view(VoiceGeneratorView())
-    
-    with db_lock:
-        cursor.execute("SELECT message_id, roles_json FROM reaction_panels")
-        panels = cursor.fetchall()
-    for msg_id, rjson in panels:
-        try:
-            roles_data = json.loads(rjson)
-            bot.add_view(PersistentRoleView(roles_data, f"rr_panel_{msg_id}"))
-        except: pass
+    async def setup_hook():
+        print("[THONG BAO] Đang tải các Cogs...")
+        await b.load_extension("cogs.music")
+        await b.load_extension("cogs.moderation")
+        await b.load_extension("cogs.economy")
+        await b.load_extension("cogs.utilities")
+        await b.load_extension("cogs.social")
+        await b.load_extension("cogs.welcome")
+        await b.load_extension("cogs.ai_chatbot")
+        print("[THONG BAO] Đã tải xong Cogs.")
+
+        # Đăng ký các Persistent Views
+        b.add_view(TicketView())
+        b.add_view(TicketControlView())
+        b.add_view(MusicControlView())
+        b.add_view(VoiceGeneratorView())
         
-    await bot.tree.sync()
+        with db_lock:
+            cursor.execute("SELECT message_id, roles_json FROM reaction_panels")
+            panels = cursor.fetchall()
+        for msg_id, rjson in panels:
+            try:
+                roles_data = json.loads(rjson)
+                b.add_view(PersistentRoleView(roles_data, f"rr_panel_{msg_id}"))
+            except: pass
+            
+        await b.tree.sync()
 
-bot.setup_hook = setup_hook
+    b.setup_hook = setup_hook
 
-@bot.event
-async def on_ready():
-    print(f'[THONG BAO] Bot {bot.user} da Started thanh cong!')
+    @b.event
+    async def on_ready():
+        print(f'[THONG BAO] Bot {b.user} da Started thanh cong!')
+        if not check_timed_roles.is_running():
+            check_timed_roles.start()
+        if not check_gui_tasks.is_running():
+            check_gui_tasks.start()
+        await export_server_data()
+        print("[THONG BAO] Da cap nhat danh sach Role va Channel moi nhat.")
 
-    if not check_timed_roles.is_running():
-        check_timed_roles.start()
-    if not check_gui_tasks.is_running():
-        check_gui_tasks.start()
-    await export_server_data()
-    print("[THONG BAO] Da cap nhat danh sach Role và Channel moi nhat.")
+    @b.event
+    async def on_guild_join(g): await export_server_data()
+    @b.event
+    async def on_guild_remove(g): await export_server_data()
+    @b.event
+    async def on_guild_role_create(r): await export_server_data()
+    @b.event
+    async def on_guild_role_update(bef, aft): await export_server_data()
+    @b.event
+    async def on_guild_channel_create(c): await export_server_data()
+    @b.event
+    async def on_guild_channel_update(bef, aft): await export_server_data()
 
-@bot.event
-async def on_guild_join(g): await export_server_data()
-@bot.event
-async def on_guild_remove(g): await export_server_data()
-@bot.event
-async def on_guild_role_create(r): await export_server_data()
-@bot.event
-async def on_guild_role_update(b, a): await export_server_data()
-@bot.event
-async def on_guild_channel_create(c): await export_server_data()
-@bot.event
-async def on_guild_channel_update(b, a): await export_server_data()
+    @b.event
+    async def on_command_error(ctx, error):
+        if isinstance(error, commands.CommandNotFound): return
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ Bạn không có quyền thực hiện lệnh này.")
+            return
+        print(f"[LOI LENH] {error}")
 
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound): return
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ Bạn không có quyền thực hiện lệnh này.")
-        return
-    print(f"[LOI LENH] {error}")
+# Gắn events cho bot instance khởi tạo ban đầu
+register_bot_events(bot)
 
 async def main():
-    # 1. Start HTTP API web server immediately to bind to the port (e.g. on Render)
-    import core.shared as shared
-    if not shared.api_server_started:
-        print("[THONG BAO] Dang khoi dong HTTP API server...")
-        asyncio.create_task(start_api_server(bot))
-        shared.api_server_started = True
+    global bot
 
-    # 2. Retrieve token
+    import core.shared as shared
+
+    # 1. Lấy token
     token = os.environ.get("DISCORD_TOKEN") or config.get("token")
     if not token:
         print("[LOI] Chua cau hinh DISCORD_TOKEN trong .env hoac config.json!")
         sys.exit(1)
 
-    # 3. Connect bot with retry loop and exponential backoff
+    # 2. Khởi động HTTP API server ngay lập tức để Render nhận diện port
+    if not shared.api_server_started:
+        print("[THONG BAO] Dang khoi dong HTTP API server...")
+        asyncio.create_task(start_api_server(bot))
+        shared.api_server_started = True
+
+    # 3. Vòng lặp kết nối — tạo lại Bot instance mới sau mỗi lần thất bại
     retry_delay = 5
+    attempt = 0
     while True:
+        attempt += 1
         try:
-            print("[THONG BAO] Dang ket noi den Discord API...")
+            print(f"[THONG BAO] Dang ket noi den Discord API... (lan thu {attempt})")
             await bot.start(token)
+            # Thoát vòng lặp nếu bot chạy xong bình thường (ví dụ bị tắt thủ công)
             break
         except discord.errors.HTTPException as e:
             if e.status == 429:
-                print(f"[LOI REST/GATEWAY] 429 Too Many Requests tu Discord. Thu lai sau {retry_delay} giay. Chi tiet: {e}")
+                # Ưu tiên dùng retry_after do Discord trả về, fallback về backoff
+                retry_after = getattr(e, "retry_after", None) or retry_delay
+                print(f"[LOI 429] Discord yeu cau cho {retry_after:.1f} giay truoc khi thu lai.")
+                await asyncio.sleep(retry_after)
             else:
-                print(f"[LOI REST/GATEWAY] HTTP error: {e}. Thu lai sau {retry_delay} giay.")
+                print(f"[LOI HTTP {e.status}] {e}. Thu lai sau {retry_delay} giay.")
+                await asyncio.sleep(retry_delay)
+        except discord.errors.LoginFailure as e:
+            print(f"[LOI TOKEN] Token khong hop le: {e}. Dung chuong trinh.")
+            sys.exit(1)
         except Exception as e:
             print(f"[LOI BAT THUONG] {e}. Thu lai sau {retry_delay} giay.")
-        
+            await asyncio.sleep(retry_delay)
+
+        # Đóng sạch bot cũ
         try:
             await bot.close()
         except Exception:
             pass
-            
-        await asyncio.sleep(retry_delay)
+
+        # Tạo Bot instance hoàn toàn mới (aiohttp session mới)
+        bot = create_bot()
+        register_bot_events(bot)
+
+        # Cập nhật bot reference trong API server
+        try:
+            from core import api_server as _api_mod
+            if hasattr(_api_mod, '_app') and _api_mod._app is not None:
+                _api_mod._app["bot"] = bot
+        except Exception:
+            pass
+
         retry_delay = min(retry_delay * 2, 300)
 
 if __name__ == "__main__":
