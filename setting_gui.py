@@ -50,14 +50,37 @@ gui_settings = load_gui_settings()
 
 def _remote_request(action, extra_payload=None):
     try:
-        url = entry_remote_url.get().strip().rstrip("/") + "/api"
+        url = entry_remote_url.get().strip().rstrip("/")
         key = entry_remote_key.get().strip()
     except NameError:
         active = gui_settings.get("active_profile", "Default")
         profile = gui_settings.get("profiles", {}).get(active, {})
-        url = profile.get("remote_api_url", "").strip().rstrip("/") + "/api"
+        url = profile.get("remote_api_url", "").strip().rstrip("/")
         key = profile.get("api_secret", "BOT_SECRET_KEY_2026").strip()
         
+    # Nếu không cấu hình URL từ xa (Local mode), tự động kết nối tới Bot cục bộ trên localhost
+    if not url:
+        port = "8080"
+        local_key = "changeme123"
+        try:
+            port = entry_api_port.get().strip()
+            # Lấy secret key từ config đang load
+            local_key = cfg.get("api_secret", "changeme123")
+        except NameError:
+            active = gui_settings.get("active_profile", "Default")
+            profile = gui_settings.get("profiles", {}).get(active, {})
+            config_file = profile.get("config_file", "config.json")
+            if os.path.exists(config_file):
+                try:
+                    with open(config_file, "r", encoding="utf-8") as f:
+                        local_cfg = json.load(f)
+                        port = str(local_cfg.get("api_port", 8080))
+                        local_key = local_cfg.get("api_secret", "changeme123")
+                except: pass
+        url = f"http://127.0.0.1:{port}"
+        key = local_key
+
+    url = url.rstrip("/") + "/api"
     if not url or "http" not in url: return None
     payload = {"action": action}
     if extra_payload: payload.update(extra_payload)
@@ -65,6 +88,7 @@ def _remote_request(action, extra_payload=None):
         resp = http_requests.post(url, json=payload, headers={"X-API-Key": key}, timeout=10)
         return resp.json()
     except: return None
+
 
 def load_current_config():
     active = gui_settings.get("active_profile", "Default")
@@ -86,7 +110,59 @@ def load_current_config():
 def get_server_data():
     resp = _remote_request("GET_SERVER_DATA")
     if resp and resp.get("ok"): return resp.get("data", {})
-    return {}
+    
+    # Fallback to local config's servers list if offline
+    fallback_data = {}
+    try:
+        active = gui_settings.get("active_profile", "Default")
+        profile = gui_settings.get("profiles", {}).get(active, {})
+        config_file = profile.get("config_file", "config.json")
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                local_cfg = json.load(f)
+                for sid, sval in local_cfg.get("servers", {}).items():
+                    s_name = sval.get("name") if isinstance(sval, dict) and sval.get("name") else f"Server {sid}"
+                    fallback_data[sid] = {
+                        "name": f"{s_name} (Offline)",
+                        "channels": sval.get("cached_channels", []) if isinstance(sval, dict) else [],
+                        "roles": sval.get("cached_roles", []) if isinstance(sval, dict) else [],
+                        "categories": sval.get("cached_categories", []) if isinstance(sval, dict) else []
+                    }
+    except: pass
+    return fallback_data
+
+def get_server_display_name(sid, sdata):
+    name = sdata.get("name", f"Server {sid}")
+    return f"{name} [{sid}]"
+
+def parse_server_id_from_choice(choice):
+    if not choice or choice in ["Chọn Server", "Chọn Server bên dưới...", "(Nhấn F5 để tải Server)"]:
+        return None
+    if "[" in choice and choice.endswith("]"):
+        sid = choice.rsplit("[", 1)[-1].rstrip("]")
+        if sid in srv_data:
+            return sid
+    if choice in srv_data:
+        return choice
+    for sid, sdata in srv_data.items():
+        if sdata.get("name") == choice:
+            return sid
+    return None
+
+def update_server_comboboxes():
+    global srv_data
+    srv_data = get_server_data()
+    server_options = ["Chọn Server"] + [get_server_display_name(k, v) for k, v in srv_data.items()]
+    if 'combo_servers' in globals():
+        curr = combo_servers.get()
+        combo_servers.configure(values=server_options)
+        if curr in server_options:
+            combo_servers.set(curr)
+        else:
+            combo_servers.set("Chọn Server")
+    if 'combo_social_server' in globals():
+        social_options = [get_server_display_name(k, v) for k, v in srv_data.items()]
+        combo_social_server.configure(values=social_options)
 
 # --- QUẢN LÝ TIẾN TRÌNH BOT ---
 def is_bot_running(profile_name):
@@ -98,14 +174,14 @@ def is_bot_running(profile_name):
     profile = gui_settings["profiles"].get(profile_name)
     if not profile: return False
     config_file = profile.get("config_file", "config.json")
-    current_dir = os.path.abspath(os.path.dirname(__file__))
+    current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
     for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
             cmd = proc_info.info.get('cmdline') or []
-            cmd_str = " ".join(cmd)
+            cmd_str = " ".join(cmd).lower()
             if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
-                if f"--config={config_file}" in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
-                    if any(current_dir in arg for arg in cmd):
+                if f"--config={config_file}".lower() in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+                    if any(current_dir in os.path.normpath(arg).lower() for arg in cmd):
                         bot_processes[profile_name] = psutil.Process(proc_info.info['pid'])
                         return True
         except: pass
@@ -142,14 +218,14 @@ def stop_bot():
         bot_processes[active] = None
         
     # Stop system processes matching config
-    current_dir = os.path.abspath(os.path.dirname(__file__))
+    current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
     for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
             cmd = proc_info.info.get('cmdline') or []
-            cmd_str = " ".join(cmd)
+            cmd_str = " ".join(cmd).lower()
             if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
-                if f"--config={config_file}" in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
-                    if any(current_dir in arg for arg in cmd):
+                if f"--config={config_file}".lower() in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+                    if any(current_dir in os.path.normpath(arg).lower() for arg in cmd):
                         spider = psutil.Process(proc_info.info['pid'])
                         for child in spider.children(recursive=True): child.kill()
                         spider.kill()
@@ -181,7 +257,14 @@ def start_bot():
             with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(default_cfg, f, indent=4, ensure_ascii=False)
                 
-        bot_processes[active] = subprocess.Popen([sys.executable, "main.py", f"--config={config_file}"])
+        # Tự động phát hiện virtual environment (.venv) để dùng Python chuẩn
+        python_exe = sys.executable
+        if os.name == 'nt' and os.path.exists(os.path.join(".venv", "Scripts", "python.exe")):
+            python_exe = os.path.join(".venv", "Scripts", "python.exe")
+        elif os.path.exists(os.path.join(".venv", "bin", "python")):
+            python_exe = os.path.join(".venv", "bin", "python")
+
+        bot_processes[active] = subprocess.Popen([python_exe, "main.py", f"--config={config_file}"])
         update_status_label()
     except Exception as e: messagebox.showerror("Lỗi", f"Không thể bật Bot: {e}")
 
@@ -287,15 +370,23 @@ def save_settings():
             if "servers" not in cfg: cfg["servers"] = {}
             if current_server_id not in cfg["servers"]: cfg["servers"][current_server_id] = {}
             sc = cfg["servers"][current_server_id]
+            if current_server_data.get("name"):
+                clean_name = current_server_data.get("name").replace(" (Offline)", "").replace(" (Offline/Chưa kết nối)", "")
+                sc["name"] = clean_name
             
-            sel_chan = combo_welcome_channel.get()
-            sc["welcome_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_chan), None)
-            
-            sel_am_chan = combo_automod_channel.get()
-            sc["automod_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_am_chan), None)
-            
-            sel_log_chan = combo_log_channel.get()
-            sc["log_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_log_chan), None)
+            # Chỉ cập nhật ID khi bot đang online và đã fetch được dữ liệu thực tế
+            if current_server_data.get("channels"):
+                sel_chan = combo_welcome_channel.get()
+                sc["welcome_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_chan), None)
+                
+                sel_am_chan = combo_automod_channel.get()
+                sc["automod_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_am_chan), None)
+                
+                sel_log_chan = combo_log_channel.get()
+                sc["log_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_log_chan), None)
+
+                sc["boost_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == combo_boost_channel.get()), None)
+                sc["rr_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == combo_rr_channel.get()), None)
             
             t_mute = entry_automod_mute_mins.get()
             sc["automod_mute_minutes"] = int(t_mute) if t_mute.isdigit() else 5
@@ -310,25 +401,24 @@ def save_settings():
                 sc["avatar_size"] = int(entry_size.get())
             except: pass
             
-            sel_auto = combo_auto_role.get()
-            sc["auto_role_id"] = next((r["id"] for r in current_server_data.get("roles", []) if r["name"] == sel_auto), None)
+            if current_server_data.get("roles"):
+                sel_auto = combo_auto_role.get()
+                sc["auto_role_id"] = next((r["id"] for r in current_server_data.get("roles", []) if r["name"] == sel_auto), None)
+
+                sc["mod_role_ids"] = [r["id"] for r in current_mod_roles]
+                if "mod_role_id" in sc: del sc["mod_role_id"]
+
+                sel_booster_role = combo_booster_role.get()
+                sc["booster_role_id"] = next((str(r["id"]) for r in current_server_data.get("roles", []) if r["name"] == sel_booster_role), None)
+
+                sc["rr_roles_list"] = [r["id"] for r in current_rr_roles]
             
-            sel_voice_category = combo_voice_category.get()
-            sc["voice_category_id"] = next((str(c["id"]) for c in current_server_data.get("categories", []) if c["name"] == sel_voice_category), None)
+            if current_server_data.get("categories"):
+                sel_voice_category = combo_voice_category.get()
+                sc["voice_category_id"] = next((str(c["id"]) for c in current_server_data.get("categories", []) if c["name"] == sel_voice_category), None)
 
-
-
-            sc["mod_role_ids"] = [r["id"] for r in current_mod_roles]
-            if "mod_role_id" in sc: del sc["mod_role_id"]
-
-            sc["boost_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == combo_boost_channel.get()), None)
             sc["boost_message"] = entry_boost_msg.get().strip() or "🚀 **{mention}** vừa boost server! Cảm ơn vì sự ủng hộ của bạn! 💜"
-            sel_booster_role = combo_booster_role.get()
-            sc["booster_role_id"] = next((str(r["id"]) for r in current_server_data.get("roles", []) if r["name"] == sel_booster_role), None)
-            
-            sc["rr_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == combo_rr_channel.get()), None)
             sc["rr_title"] = entry_rr_title.get()
-            sc["rr_roles_list"] = [r["id"] for r in current_rr_roles]
 
         url = profile.get("remote_api_url", "").strip().rstrip("/")
         if url and "http" in url:
@@ -407,9 +497,7 @@ def reload_gui_inputs():
     entry_cmd_ticket_setup.delete(0, tk.END); entry_cmd_ticket_setup.insert(0, cfg.get("cmd_ticket_setup", "ticket_setup"))
     
     # Reload server lists
-    srv_data = get_server_data()
-    combo_servers.configure(values=["Chọn Server"] + [v["name"] for v in srv_data.values()])
-    combo_servers.set("Chọn Server")
+    update_server_comboboxes()
     
     # Reset active server selection
     current_server_id = None
@@ -578,11 +666,9 @@ def push_config_remote():
     with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(gui_settings, f, indent=4, ensure_ascii=False)
     
-    global cfg, srv_data
+    global cfg
     cfg = load_current_config()
-    srv_data = get_server_data()
-    combo_servers.configure(values=["Chọn Server"] + list(srv_data.keys()))
-    if srv_data: combo_servers.set("Chọn Server")
+    update_server_comboboxes()
     messagebox.showinfo("Thành công", "Đã lưu và tải cấu hình mới từ Bot!")
 
 btn_row = ctk.CTkFrame(fr, fg_color="transparent")
@@ -650,8 +736,17 @@ entry_cmd_ticket_setup = mki_grid(fcmd_eco_r, "🎫 Setup Ticket:", "cmd_ticket_
 fsrv = ctk.CTkFrame(sf_server, fg_color="#5865F2", corner_radius=12); fsrv.pack(pady=10, fill="x")
 ctk.CTkLabel(fsrv, text="🌐 TRẠM ĐIỀU KHIỂN SERVER TÙY CHỈNH", font=("Segoe UI", 16, "bold"), text_color="white").pack(pady=(15,5))
 
-combo_servers = ctk.CTkComboBox(fsrv, values=["Chọn Server bên dưới..."] + [v["name"] for v in srv_data.values()], width=420, height=40, font=("Segoe UI", 14, "bold"))
-combo_servers.pack(pady=(0,15))
+f_srv_row = ctk.CTkFrame(fsrv, fg_color="transparent")
+f_srv_row.pack(pady=(0,15))
+
+combo_servers = ctk.CTkComboBox(f_srv_row, values=["Chọn Server"] + [get_server_display_name(k, v) for k, v in srv_data.items()], width=310, height=40, font=("Segoe UI", 13, "bold"))
+combo_servers.pack(side="left", padx=5)
+
+def btn_refresh_servers_click():
+    update_server_comboboxes()
+    messagebox.showinfo("Thông báo", f"Đã cập nhật danh sách Server! ({len(srv_data)} server)")
+
+ctk.CTkButton(f_srv_row, text="🔄 Tải Lại", width=95, height=40, font=("Segoe UI", 12, "bold"), fg_color="#23A559", hover_color="#1A7A41", command=btn_refresh_servers_click).pack(side="left", padx=5)
 
 # SERVER SPECIFIC CONTROLS
 fs_spec = ctk.CTkFrame(sf_server, fg_color="#2B2D31", corner_radius=12); fs_spec.pack(pady=10, fill="x")
@@ -867,13 +962,11 @@ ctk.CTkButton(f_rr, text="▶ PHÁT BẢNG MÀU LÊN SERVER", fg_color="#23A559"
 def on_server_select(choice):
     try:
         global current_server_id, current_server_data
-        if "Chọn Server" in choice: return
+        sid = parse_server_id_from_choice(choice)
+        if not sid: return
         
-        for sid, sdata in srv_data.items():
-            if sdata["name"] == choice:
-                current_server_id = sid
-                current_server_data = sdata
-                break
+        current_server_id = sid
+        current_server_data = srv_data.get(sid, {})
                 
         c_names = ["Không Yêu Cầu"] + [c["name"] for c in current_server_data.get("channels", [])]
         r_names = ["Không Yêu Cầu"] + [r["name"] for r in current_server_data.get("roles", [])]
@@ -1082,7 +1175,7 @@ combo_social_platform.pack(side="left", padx=(0,15))
 
 ctk.CTkLabel(row1, text="Server:", font=("Segoe UI", 12, "bold"), width=60, anchor="w").pack(side="left")
 combo_social_server = ctk.CTkComboBox(row1,
-    values=["(Nhấn F5 để tải Server)"] + list(srv_data.keys()),
+    values=[get_server_display_name(k, v) for k, v in srv_data.items()],
     width=200, height=32, font=("Segoe UI", 11))
 combo_social_server.pack(side="left")
 
@@ -1110,19 +1203,17 @@ entry_social_ping.pack(side="left")
 def on_social_server_select(choice):
     """Load channels for selected server into the channel combobox."""
     try:
-        # Find server id by name
-        for sid, sdata in srv_data.items():
-            if sdata.get("name") == choice or sid == choice:
-                channels = [(c["name"], str(c["id"])) for c in sdata.get("channels", [])]
-                combo_social_channel.configure(values=[f"{n} ({i})" for n, i in channels])
-                if channels:
-                    combo_social_channel.set(f"{channels[0][0]} ({channels[0][1]})")
-                return
+        sid = parse_server_id_from_choice(choice)
+        if sid and sid in srv_data:
+            sdata = srv_data[sid]
+            channels = [(c["name"], str(c["id"])) for c in sdata.get("channels", [])]
+            combo_social_channel.configure(values=[f"{n} ({i})" for n, i in channels])
+            if channels:
+                combo_social_channel.set(f"{channels[0][0]} ({channels[0][1]})")
     except: pass
 
 combo_social_server.configure(command=on_social_server_select)
-# Populate with server names (not IDs)
-combo_social_server.configure(values=[v.get("name", k) for k, v in srv_data.items()])
+combo_social_server.configure(values=[get_server_display_name(k, v) for k, v in srv_data.items()])
 
 def btn_add_social_click():
     platform = combo_social_platform.get().lower().strip()
@@ -1138,9 +1229,9 @@ def btn_add_social_click():
     # Extract channel ID from "channel-name (123456789)"
     channel_id = chan_val.rsplit("(", 1)[-1].rstrip(")")
 
-    # Find guild_id for the selected server name
-    sv_name = combo_social_server.get()
-    guild_id = next((k for k, v in srv_data.items() if v.get("name") == sv_name), "")
+    # Find guild_id for the selected server
+    sv_choice = combo_social_server.get()
+    guild_id = parse_server_id_from_choice(sv_choice) or ""
     if not guild_id:
         return messagebox.showwarning("⚠️ Thiếu Server", "Không tìm thấy Server ID. Vui lòng chọn lại.")
 
@@ -1204,10 +1295,27 @@ refresh_social_list()
 
 
 
+last_bot_status = False
+
 def check_status_loop():
+    global last_bot_status, srv_data
     try:
+        active = gui_settings.get("active_profile", "Default")
+        is_running = is_bot_running(active)
         update_status_label()
-    except: pass
+        
+        # Nếu bot vừa chuyển từ OFF -> ON hoặc srv_data rỗng/chỉ chứa offline server nhưng bot đang chạy
+        has_only_offline = not srv_data or all("(Offline)" in v.get("name", "") or "Offline/Chưa kết nối" in v.get("name", "") for v in srv_data.values())
+        if is_running and (not last_bot_status or has_only_offline):
+            new_srv_data = get_server_data()
+            # Kiểm tra xem new_srv_data có thực sự chứa dữ liệu thật (không phải offline fallback)
+            has_real_data = new_srv_data and not all("(Offline)" in v.get("name", "") or "Offline/Chưa kết nối" in v.get("name", "") for v in new_srv_data.values())
+            if has_real_data:
+                update_server_comboboxes()
+                
+        last_bot_status = is_running
+    except Exception as e:
+        print(f"Lỗi loop trạng thái: {e}")
     root.after(2000, check_status_loop)
 
 # Load GUI fields with the active profile config

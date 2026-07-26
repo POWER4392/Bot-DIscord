@@ -61,6 +61,29 @@ async def export_server_data():
         server_data[str(guild.id)] = {"name": guild.name, "roles": roles, "channels": channels, "categories": categories}
     shared.server_data = server_data
 
+    # Cache server metadata to config file for offline GUI access
+    try:
+        from core.shared import config_file
+        updated = False
+        if "servers" not in config:
+            config["servers"] = {}
+        for gid, ginfo in server_data.items():
+            if gid not in config["servers"]:
+                config["servers"][gid] = {}
+                updated = True
+            cfg_srv = config["servers"][gid]
+            if cfg_srv.get("name") != ginfo["name"]:
+                cfg_srv["name"] = ginfo["name"]
+                updated = True
+            cfg_srv["cached_channels"] = ginfo["channels"]
+            cfg_srv["cached_roles"] = ginfo["roles"]
+            cfg_srv["cached_categories"] = ginfo["categories"]
+        if updated and config_file and os.path.exists(config_file):
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"[EXPORT SERVER DATA] Lỗi cập nhật cache: {e}")
+
 @tasks.loop(minutes=1)
 async def check_timed_roles():
     now = datetime.datetime.now().timestamp()
