@@ -14,13 +14,11 @@ from core.database import cursor, conn, db_lock
 MAX_HISTORY_PER_USER = 20
 
 
-DEFAULT_KEY = "AQ.Ab8" + "RN6KG8L_jRqvghmnwq0K52HeX7LLl8f086xXBd7Q9JOvI_A"
-
 class AIChatbot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         from core.shared import config
-        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or DEFAULT_KEY
+        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
         self.api_key = self.sanitize_key(raw_key)
         self.model_name = "gemini-2.0-flash"
         self.model = None
@@ -38,7 +36,8 @@ class AIChatbot(commands.Cog):
         self.max_messages_in_window = 5
         self.max_duplicates = 3
 
-        self.ensure_model_initialized()
+        if self.api_key:
+            self.ensure_model_initialized()
 
     def sanitize_key(self, key: str) -> str:
         if not key:
@@ -52,8 +51,11 @@ class AIChatbot(commands.Cog):
         if self.model:
             return True
         from core.shared import config
-        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or DEFAULT_KEY
-        key = self.sanitize_key(raw_key) or DEFAULT_KEY
+        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+        key = self.sanitize_key(raw_key)
+        if not key:
+            return False
+
         self.api_key = key
         try:
             genai.configure(api_key=self.api_key)
@@ -78,12 +80,7 @@ class AIChatbot(commands.Cog):
                 print(f"[AI Warning] Không nạp được model {m_name}: {ex}")
                 continue
 
-        try:
-            self.model_name = "gemini-2.0-flash"
-            self.model = genai.GenerativeModel(self.model_name)
-        except Exception:
-            pass
-        return True
+        return False
 
     # ------------------------------------------------------------------
     # Helper: lấy hoặc tạo chat session cho (guild_id, user_id)
@@ -506,10 +503,10 @@ class AIChatbot(commands.Cog):
             except Exception as e:
                 err_str = str(e)
                 print(f"[AI Error] Loi khi goi Gemini API: {err_str}")
-                if "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
-                    err_msg = "❌ **Lỗi Gemini API Key:** Key của bạn không hợp lệ hoặc đã bị vô hiệu hóa. Hãy tạo Key mới tại `https://aistudio.google.com/app/apikey` và nạp bằng lệnh `!setkey <key_moi>`."
+                if "401" in err_str or "API_KEY_INVALID" in err_str or "API key not valid" in err_str or "authentication credentials" in err_str:
+                    err_msg = "❌ **Lỗi Gemini API Key (401):** Key Gemini hiện tại không hợp lệ hoặc đã bị vô hiệu hóa. Hãy tạo Key mới từ `https://aistudio.google.com/app/apikey` và nạp bằng lệnh `/setkey` hoặc `!setkey <key_moi>`."
                 elif "Quota" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                    err_msg = "⚠️ **Lỗi Hạn Ngạch (Quota Limit):** API Key của bạn đã vượt quá giới hạn request miễn phí của Google. Vui lòng đợi ít phút hoặc đổi sang Key Gemini mới."
+                    err_msg = "⚠️ **Lỗi Hạn Ngạch (Quota Limit):** API Key của bạn đã vượt quá giới hạn request miễn phí của Google. Vui lòng nạp Key Gemini mới bằng lệnh `/setkey <key_moi>`."
                 else:
                     err_msg = f"❌ **Lỗi kết nối Gemini AI:** `{err_str[:200]}`"
 
