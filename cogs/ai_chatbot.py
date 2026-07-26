@@ -43,13 +43,22 @@ class AIChatbot(commands.Cog):
             except Exception as e:
                 print(f"[AI Error] Loi khi cau hinh Gemini: {e}")
 
+    def sanitize_key(self, key: str) -> str:
+        if not key:
+            return ""
+        k = str(key).strip()
+        if (k.startswith('"') and k.endswith('"')) or (k.startswith("'") and k.endswith("'")):
+            k = k[1:-1].strip()
+        return k
+
     def ensure_model_initialized(self) -> bool:
         if self.model:
             return True
         from core.shared import config
-        key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
-        if key and str(key).strip():
-            self.api_key = str(key).strip()
+        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+        key = self.sanitize_key(raw_key)
+        if key:
+            self.api_key = key
             try:
                 genai.configure(api_key=self.api_key)
             except Exception as e:
@@ -465,8 +474,15 @@ class AIChatbot(commands.Cog):
                     await channel.send(reply_text)
 
             except Exception as e:
-                print(f"[AI Error] Loi khi goi Gemini API: {e}")
-                err_msg = "❌ Đã xảy ra lỗi khi kết nối với AI. Vui lòng thử lại sau."
+                err_str = str(e)
+                print(f"[AI Error] Loi khi goi Gemini API: {err_str}")
+                if "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
+                    err_msg = "❌ **Lỗi Gemini API Key:** Key của bạn không hợp lệ hoặc đã bị vô hiệu hóa. Hãy tạo Key mới tại `https://aistudio.google.com/app/apikey` và nạp bằng lệnh `!setkey <key_moi>`."
+                elif "Quota" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    err_msg = "⚠️ **Lỗi Hạn Ngạch (Quota Limit):** API Key của bạn đã vượt quá giới hạn request miễn phí của Google. Vui lòng đợi ít phút hoặc đổi sang Key Gemini mới."
+                else:
+                    err_msg = f"❌ **Lỗi kết nối Gemini AI:** `{err_str[:200]}`"
+
                 if interaction:
                     await interaction.followup.send(err_msg)
                 elif reply_target:
