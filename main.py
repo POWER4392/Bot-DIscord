@@ -202,7 +202,11 @@ def register_bot_events(b):
                 b.add_view(PersistentRoleView(roles_data, f"rr_panel_{msg_id}"))
             except: pass
             
-        await b.tree.sync()
+        try:
+            await b.tree.sync()
+            print("[THONG BAO] Da sync Slash Commands voi Discord API.")
+        except Exception as e:
+            print(f"[WARNING] Sync Slash Commands skipped: {e}")
 
     b.setup_hook = setup_hook
 
