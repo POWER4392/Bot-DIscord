@@ -14,10 +14,10 @@ jobs:
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
-            echo "❌ Error: RENDER_DEPLOY_HOOK secret is not set!"
-            exit 1
+          if [ -n "$RENDER_DEPLOY_HOOK" ]; then
+            echo "🚀 Triggering Render Deployment Webhook..."
+            curl -f -X POST "$RENDER_DEPLOY_HOOK"
+            echo "✅ Deployment triggered successfully!"
+          else
+            echo "ℹ️ RENDER_DEPLOY_HOOK secret is not configured. Render native auto-deploy is active."
           fi
-          echo "🚀 Triggering Render Deployment..."
-          curl -f -X POST "$RENDER_DEPLOY_HOOK"
-          echo "✅ Deployment triggered successfully!"
