@@ -288,10 +288,9 @@ class AIChatbot(commands.Cog):
         await self._do_chat(message.channel, message.author, message.guild, content, reply_target=message)
 
     # ------------------------------------------------------------------
-    # Prefix Command: !setkey <key>
+    # Hybrid Command: !setkey <key> / /setkey
     # ------------------------------------------------------------------
-    @commands.command(name="setkey", description="Cập nhật Gemini API Key cho Bot")
-    @commands.has_permissions(administrator=True)
+    @commands.hybrid_command(name="setkey", description="Cập nhật Gemini API Key cho Bot (lệnh !setkey hoặc /setkey).")
     async def setkey_cmd(self, ctx: commands.Context, key: str):
         key = self.sanitize_key(key)
         if not key or len(key) < 15:

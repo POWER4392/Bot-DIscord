@@ -40,8 +40,9 @@ def create_bot():
     _intents.members = True
     _intents.voice_states = True
     _intents.presences = True
+    p = config.get("prefix", ".")
     _bot = commands.Bot(
-        command_prefix=config.get("prefix", "!"),
+        command_prefix=commands.when_mentioned_or(p, "!", "."),
         intents=_intents,
         proxy=proxy
     )
