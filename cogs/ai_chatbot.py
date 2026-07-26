@@ -30,6 +30,22 @@ class AIChatbot(commands.Cog):
             except Exception as e:
                 print(f"[AI Error] Loi khi cau hinh Gemini: {e}")
 
+    def ensure_model_initialized(self) -> bool:
+        if self.model:
+            return True
+        from core.shared import config
+        key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+        if key and str(key).strip():
+            try:
+                self.api_key = str(key).strip()
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                print(f"[AI] Gemini API da duoc nap tu dong thanh cong. (Model: {self.model_name})")
+                return True
+            except Exception as e:
+                print(f"[AI Error] Loi khi cau hinh lai Gemini: {e}")
+        return False
+
         # In-memory chat sessions: {(guild_id, user_id): genai.ChatSession}
         self.chat_sessions: dict = {}
 
@@ -225,7 +241,7 @@ class AIChatbot(commands.Cog):
             await message.reply("Xin chào! Bạn có thể đặt câu hỏi cho tôi tại đây.")
             return
 
-        if not self.model:
+        if not self.ensure_model_initialized():
             await message.reply(
                 "⚠️ Tính năng AI Chatbot chưa được cấu hình API Key (GEMINI_API_KEY). Vui lòng liên hệ Admin!"
             )
@@ -239,7 +255,7 @@ class AIChatbot(commands.Cog):
     @app_commands.command(name="ask", description="Hỏi AI Chatbot bất kỳ điều gì (hỗ trợ đính kèm hình ảnh)!")
     @app_commands.describe(question="Câu hỏi của bạn hoặc lời nhắc cho hình ảnh", image="Hình ảnh đính kèm (không bắt buộc)")
     async def ask(self, interaction: discord.Interaction, question: str, image: discord.Attachment = None):
-        if not self.model:
+        if not self.ensure_model_initialized():
             await interaction.response.send_message(
                 "⚠️ Tính năng AI Chatbot chưa được cấu hình. Vui lòng liên hệ Admin!",
                 ephemeral=True

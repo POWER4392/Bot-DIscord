@@ -150,6 +150,15 @@ def create_handle_api(bot):
                     json.dump(new_config, f, indent=4, ensure_ascii=False)
                 config.clear()
                 config.update(new_config)
+                
+                g_key = config.get("gemini_api_key") or config.get("gemini_key")
+                if g_key:
+                    os.environ["GEMINI_API_KEY"] = str(g_key).strip()
+                    ai_cog = bot.cogs.get("AIChatbot")
+                    if ai_cog:
+                        ai_cog.model = None
+                        ai_cog.ensure_model_initialized()
+                
                 return web.json_response({"ok": True, "msg": "Config updated"})
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
