@@ -65,9 +65,9 @@ class AIChatbot(commands.Cog):
                 print(f"[AI Error] genai.configure: {e}")
 
             models_to_try = [
-                "gemini-1.5-flash",
                 "gemini-2.0-flash",
-                "gemini-1.5-pro",
+                "gemini-2.5-flash",
+                "gemini-1.5-flash",
                 "gemini-pro"
             ]
             for m_name in models_to_try:
