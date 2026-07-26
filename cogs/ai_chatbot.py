@@ -49,14 +49,27 @@ class AIChatbot(commands.Cog):
         from core.shared import config
         key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
         if key and str(key).strip():
+            self.api_key = str(key).strip()
             try:
-                self.api_key = str(key).strip()
                 genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel(self.model_name)
-                print(f"[AI] Gemini API da duoc nap tu dong thanh cong. (Model: {self.model_name})")
-                return True
             except Exception as e:
-                print(f"[AI Error] Loi khi cau hinh lai Gemini: {e}")
+                print(f"[AI Error] genai.configure: {e}")
+
+            models_to_try = [
+                "gemini-1.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-pro",
+                "gemini-pro"
+            ]
+            for m_name in models_to_try:
+                try:
+                    self.model_name = m_name
+                    self.model = genai.GenerativeModel(self.model_name)
+                    print(f"[AI] Gemini API nap thanh cong voi model {self.model_name}.")
+                    return True
+                except Exception as ex:
+                    print(f"[AI Warning] Khong nap duoc model {m_name}: {ex}")
+                    continue
         return False
 
     # ------------------------------------------------------------------
@@ -216,11 +229,25 @@ class AIChatbot(commands.Cog):
             print(f"[AI DB] Loi luu thong ke token: {e}")
 
     # ------------------------------------------------------------------
-    # on_message: phản hồi trong AI channel hoặc khi được mention
+    # on_message: phản hồi trong AI channel, khi tag bot, hoặc khi reply tin nhắn bot
     # ------------------------------------------------------------------
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot:
+            return
+
+        is_mentioned = (self.bot.user in message.mentions) if self.bot.user else False
+        is_reply_to_bot = False
+        if message.reference and message.reference.resolved:
+            if isinstance(message.reference.resolved, discord.Message):
+                if self.bot.user and message.reference.resolved.author.id == self.bot.user.id:
+                    is_reply_to_bot = True
+
+        from core.shared import config
+        ai_channel_id = config.get("ai_channel_id")
+        is_ai_channel = bool(ai_channel_id and str(message.channel.id) == str(ai_channel_id))
+
+        if not (is_mentioned or is_reply_to_bot or is_ai_channel):
             return
 
         # Anti-Spam check
@@ -228,26 +255,57 @@ class AIChatbot(commands.Cog):
         if is_spam:
             return
 
-        is_mentioned = self.bot.user in message.mentions
-        from core.shared import config
-        ai_channel_id = config.get("ai_channel_id")
-        is_ai_channel = ai_channel_id and str(message.channel.id) == str(ai_channel_id)
+        content = message.content
+        if self.bot.user:
+            content = content.replace(f"<@{self.bot.user.id}>", "").replace(f"<@!{self.bot.user.id}>", "").strip()
+        else:
+            content = content.strip()
 
-        if not (is_mentioned or is_ai_channel):
-            return
-
-        content = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
-        if not content:
-            await message.reply("Xin chào! Bạn có thể đặt câu hỏi cho tôi tại đây.")
+        if not content and not message.attachments:
+            await message.reply("Xin chào! Bạn có thể đặt câu hỏi hoặc gửi hình ảnh cho tôi tại đây.")
             return
 
         if not self.ensure_model_initialized():
             await message.reply(
-                "⚠️ Tính năng AI Chatbot chưa được cấu hình API Key (GEMINI_API_KEY). Vui lòng liên hệ Admin!"
+                "⚠️ **AI Chatbot chưa có Gemini API Key!**\n"
+                "👉 Dán API Key tại **Web Dashboard** (`https://bot-discord-2ioq.onrender.com`) hoặc qua lệnh `!setkey <key_gemini>`."
             )
             return
 
         await self._do_chat(message.channel, message.author, message.guild, content, reply_target=message)
+
+    # ------------------------------------------------------------------
+    # Prefix Command: !setkey <key>
+    # ------------------------------------------------------------------
+    @commands.command(name="setkey", description="Cập nhật Gemini API Key cho Bot")
+    @commands.has_permissions(administrator=True)
+    async def setkey_cmd(self, ctx: commands.Context, key: str):
+        key = key.strip()
+        from core.shared import config, config_file
+        import json
+        config["gemini_api_key"] = key
+        os.environ["GEMINI_API_KEY"] = key
+        try:
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"[SetKey Error] {e}")
+
+        self.model = None
+        if self.ensure_model_initialized():
+            await ctx.send(f"✅ Đã nạp thành công **Gemini API Key** (Model: `{self.model_name}`)! Bạn có thể nhắn tin cho Bot ngay bây giờ.")
+        else:
+            await ctx.send("❌ Key không hợp lệ hoặc không khởi tạo được Gemini. Kiểm tra lại Key từ Google AI Studio!")
+
+    # ------------------------------------------------------------------
+    # Hybrid Command: !ai <question>
+    # ------------------------------------------------------------------
+    @commands.hybrid_command(name="ai", description="Hỏi AI Chatbot câu hỏi của bạn (dùng được lệnh !ai).")
+    async def ai_cmd(self, ctx: commands.Context, *, question: str):
+        if not self.ensure_model_initialized():
+            await ctx.send("⚠️ Tính năng AI chưa được nạp Key. Dùng lệnh `!setkey <key>` để nạp Key!")
+            return
+        await self._do_chat(ctx.channel, ctx.author, ctx.guild, question, reply_target=ctx.message)
 
     # ------------------------------------------------------------------
     # Slash command: /ask
