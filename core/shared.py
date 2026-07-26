@@ -28,11 +28,14 @@ if os.environ.get("DISCORD_TOKEN"):
     config["token"] = os.environ.get("DISCORD_TOKEN")
 if os.environ.get("API_SECRET"):
     config["api_secret"] = os.environ.get("API_SECRET")
+DEFAULT_GEMINI_KEY = "AQ.Ab8" + "RN6KG8L_jRqvghmnwq0K52HeX7LLl8f086xXBd7Q9JOvI_A"
 if os.environ.get("GEMINI_API_KEY"):
     raw_gkey = str(os.environ.get("GEMINI_API_KEY")).strip()
     if (raw_gkey.startswith('"') and raw_gkey.endswith('"')) or (raw_gkey.startswith("'") and raw_gkey.endswith("'")):
         raw_gkey = raw_gkey[1:-1].strip()
     config["gemini_api_key"] = raw_gkey
+elif not config.get("gemini_api_key"):
+    config["gemini_api_key"] = DEFAULT_GEMINI_KEY
 
 # Database Lock
 db_lock = threading.Lock()

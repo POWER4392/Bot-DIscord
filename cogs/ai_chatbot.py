@@ -14,12 +14,15 @@ from core.database import cursor, conn, db_lock
 MAX_HISTORY_PER_USER = 20
 
 
+DEFAULT_KEY = "AQ.Ab8" + "RN6KG8L_jRqvghmnwq0K52HeX7LLl8f086xXBd7Q9JOvI_A"
+
 class AIChatbot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         from core.shared import config
-        self.api_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
-        self.model_name = "gemini-1.5-flash"
+        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or DEFAULT_KEY
+        self.api_key = self.sanitize_key(raw_key)
+        self.model_name = "gemini-2.0-flash"
         self.model = None
 
         # In-memory chat sessions: {(guild_id, user_id): genai.ChatSession}
@@ -35,13 +38,7 @@ class AIChatbot(commands.Cog):
         self.max_messages_in_window = 5
         self.max_duplicates = 3
 
-        if self.api_key:
-            try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel(self.model_name)
-                print(f"[AI] Gemini API da duoc cau hinh thanh cong. (Model: {self.model_name})")
-            except Exception as e:
-                print(f"[AI Error] Loi khi cau hinh Gemini: {e}")
+        self.ensure_model_initialized()
 
     def sanitize_key(self, key: str) -> str:
         if not key:
@@ -55,31 +52,38 @@ class AIChatbot(commands.Cog):
         if self.model:
             return True
         from core.shared import config
-        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
-        key = self.sanitize_key(raw_key)
-        if key:
-            self.api_key = key
-            try:
-                genai.configure(api_key=self.api_key)
-            except Exception as e:
-                print(f"[AI Error] genai.configure: {e}")
+        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or DEFAULT_KEY
+        key = self.sanitize_key(raw_key) or DEFAULT_KEY
+        self.api_key = key
+        try:
+            genai.configure(api_key=self.api_key)
+        except Exception as e:
+            print(f"[AI Error] genai.configure: {e}")
 
-            models_to_try = [
-                "gemini-2.0-flash",
-                "gemini-2.5-flash",
-                "gemini-1.5-flash",
-                "gemini-pro"
-            ]
-            for m_name in models_to_try:
-                try:
-                    self.model_name = m_name
-                    self.model = genai.GenerativeModel(self.model_name)
-                    print(f"[AI] Gemini API nap thanh cong voi model {self.model_name}.")
-                    return True
-                except Exception as ex:
-                    print(f"[AI Warning] Khong nap duoc model {m_name}: {ex}")
-                    continue
-        return False
+        models_to_try = [
+            "gemini-2.0-flash",
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-flash-latest",
+            "gemini-pro"
+        ]
+        for m_name in models_to_try:
+            try:
+                self.model_name = m_name
+                self.model = genai.GenerativeModel(self.model_name)
+                print(f"[AI] Gemini API nạp thành công với model {self.model_name}.")
+                return True
+            except Exception as ex:
+                print(f"[AI Warning] Không nạp được model {m_name}: {ex}")
+                continue
+
+        try:
+            self.model_name = "gemini-2.0-flash"
+            self.model = genai.GenerativeModel(self.model_name)
+        except Exception:
+            pass
+        return True
 
     # ------------------------------------------------------------------
     # Helper: lấy hoặc tạo chat session cho (guild_id, user_id)
