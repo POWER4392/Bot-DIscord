@@ -459,7 +459,7 @@ f_prof_mgr.pack(fill="x", padx=10, pady=5)
 ctk.CTkLabel(f_prof_mgr, text="👤 Profile:", font=("Segoe UI", 12, "bold")).pack(side="left", padx=10, pady=5)
 
 def reload_gui_inputs():
-    global cfg, srv_data, current_server_id, current_server_data
+    global cfg, current_server_id, current_server_data
     
     # Reload remote inputs first so that subsequent network requests use the correct new API URL/Key
     active = gui_settings["active_profile"]
@@ -1301,7 +1301,7 @@ refresh_social_list()
 last_bot_status = False
 
 def check_status_loop():
-    global last_bot_status, srv_data
+    global last_bot_status
     try:
         active = gui_settings.get("active_profile", "Default")
         is_running = is_bot_running(active)
