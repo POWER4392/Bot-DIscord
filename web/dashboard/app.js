@@ -452,10 +452,14 @@ document.addEventListener("DOMContentLoaded", () => {
             // Get AI Status
             const aiStatusRes = await fetchFromAPI("GET_AI_STATUS");
             aiSystemPrompt.value = aiStatusRes.ai_system_prompt || "";
+            const aiApiKeyInput = document.getElementById("ai-api-key");
+            if (aiApiKeyInput && aiStatusRes.gemini_api_key) {
+                aiApiKeyInput.value = aiStatusRes.gemini_api_key;
+            }
             if (aiStatusRes.gemini_api_configured) {
                 aiApiStatusBadge.innerHTML = '<span class="status-badge online"><span class="dot"></span> Đã cấu hình API Key</span>';
             } else {
-                aiApiStatusBadge.innerHTML = '<span class="status-badge offline"><span class="dot"></span> Thiếu GEMINI_API_KEY trong .env</span>';
+                aiApiStatusBadge.innerHTML = '<span class="status-badge offline"><span class="dot"></span> Chưa cấu hình API Key</span>';
             }
 
             // Get Channels and Server details
@@ -633,9 +637,11 @@ document.addEventListener("DOMContentLoaded", () => {
     formAiConfig.addEventListener("submit", async (e) => {
         e.preventDefault();
 
+        const aiApiKeyInput = document.getElementById("ai-api-key");
         const payload = {
             ai_channel_id: aiChannelSelect.value,
-            ai_system_prompt: aiSystemPrompt.value.trim()
+            ai_system_prompt: aiSystemPrompt.value.trim(),
+            gemini_api_key: aiApiKeyInput ? aiApiKeyInput.value.trim() : ""
         };
 
         if (isMockMode) {

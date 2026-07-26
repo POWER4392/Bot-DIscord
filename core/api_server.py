@@ -184,6 +184,7 @@ def create_handle_api(bot):
             return web.json_response({
                 "ok": True,
                 "gemini_api_configured": gemini_key != "",
+                "gemini_api_key": gemini_key,
                 "ai_channel_id": config.get("ai_channel_id", ""),
                 "ai_system_prompt": config.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
             })

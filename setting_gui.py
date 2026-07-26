@@ -345,6 +345,7 @@ def save_settings():
         cfg["prefix"] = entry_prefix.get().strip()
         cfg["api_port"] = int(entry_api_port.get().strip()) if entry_api_port.get().strip().isdigit() else 8080
         cfg["database_name"] = entry_database_name.get().strip() or "bot_core"
+        cfg["gemini_api_key"] = entry_gemini_key.get().strip()
 
         cfg["cmd_play"] = entry_cmd_play.get()
         cfg["cmd_stop"] = entry_cmd_stop.get()
@@ -473,6 +474,7 @@ def reload_gui_inputs():
     entry_prefix.delete(0, tk.END); entry_prefix.insert(0, cfg.get("prefix", "!"))
     entry_api_port.delete(0, tk.END); entry_api_port.insert(0, str(cfg.get("api_port", 8080)))
     entry_database_name.delete(0, tk.END); entry_database_name.insert(0, cfg.get("database_name", "bot_core"))
+    entry_gemini_key.delete(0, tk.END); entry_gemini_key.insert(0, cfg.get("gemini_api_key", os.environ.get("GEMINI_API_KEY", "")))
     
     entry_cmd_play.delete(0, tk.END); entry_cmd_play.insert(0, cfg.get("cmd_play", "play"))
     entry_cmd_stop.delete(0, tk.END); entry_cmd_stop.insert(0, cfg.get("cmd_stop", "stop"))
@@ -622,6 +624,7 @@ entry_token = mki(fc, "BOT TOKEN:", "token")
 entry_prefix = mki(fc, "PREFIX (Dấu bắt đầu lệnh):", "prefix", "!")
 entry_api_port = mki(fc, "CỔNG API (API PORT):", "api_port", "8080")
 entry_database_name = mki(fc, "TÊN DATABASE (DATABASE NAME):", "database_name", "bot_core")
+entry_gemini_key = mki(fc, "GEMINI AI API KEY (Khóa Chatbot AI):", "gemini_api_key", "")
 
 # --- REMOTE MODE (Kết nối Discloud / VPS) ---
 fr = ctk.CTkFrame(sf_system, fg_color="#1E2124", corner_radius=12, border_width=1, border_color="#F1C40F")
