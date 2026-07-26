@@ -293,7 +293,11 @@ class AIChatbot(commands.Cog):
     @commands.command(name="setkey", description="Cập nhật Gemini API Key cho Bot")
     @commands.has_permissions(administrator=True)
     async def setkey_cmd(self, ctx: commands.Context, key: str):
-        key = key.strip()
+        key = self.sanitize_key(key)
+        if not key or len(key) < 15:
+            await ctx.send("❌ **Lỗi:** Key quá ngắn hoặc không hợp lệ. Gemini API Key từ Google AI Studio thường bắt đầu bằng `AIzaSy...`.")
+            return
+
         from core.shared import config, config_file
         import json
         config["gemini_api_key"] = key
@@ -305,10 +309,33 @@ class AIChatbot(commands.Cog):
             print(f"[SetKey Error] {e}")
 
         self.model = None
+        self.chat_sessions.clear()
+        
         if self.ensure_model_initialized():
-            await ctx.send(f"✅ Đã nạp thành công **Gemini API Key** (Model: `{self.model_name}`)! Bạn có thể nhắn tin cho Bot ngay bây giờ.")
+            # Thử gửi 1 test request nhỏ để kiểm tra xem Google có chấp nhận Key không
+            try:
+                test_res = await self.bot.loop.run_in_executor(
+                    None,
+                    lambda: self.model.generate_content("Xin chào")
+                )
+                if test_res and test_res.text:
+                    await ctx.send(f"✅ **Thành công!** Gemini API Key đã được xác thực và hoạt động 100% (Model: `{self.model_name}`). Hãy thử chat `!ai Xin chào` ngay bây giờ!")
+                    return
+            except Exception as test_ex:
+                err_text = str(test_ex)
+                if "Quota" in err_text or "429" in err_text or "RESOURCE_EXHAUSTED" in err_text:
+                    await ctx.send(f"⚠️ **Đã lưu Key nhưng bị giới hạn Hạn ngạch (Quota Limit):** Key này của bạn bị Google chặn do vượt hạn ngạch free tier (limit: 0). Hãy tạo Key từ tài khoản Google mới tại `https://aistudio.google.com/app/apikey`.")
+                    return
+                elif "API_KEY_INVALID" in err_text or "not valid" in err_text:
+                    await ctx.send(f"❌ **Đã lưu Key nhưng Google báo lỗi:** Key không hợp lệ (`API_KEY_INVALID`). Kiểm tra lại Key từ Google AI Studio!")
+                    return
+                else:
+                    await ctx.send(f"⚠️ **Đã nạp Key nhưng Google API báo lỗi:** `{err_text[:150]}`")
+                    return
+
+            await ctx.send(f"✅ Đã nạp **Gemini API Key** (Model: `{self.model_name}`).")
         else:
-            await ctx.send("❌ Key không hợp lệ hoặc không khởi tạo được Gemini. Kiểm tra lại Key từ Google AI Studio!")
+            await ctx.send("❌ Không thể khởi tạo mô hình Gemini với Key này. Kiểm tra lại Key từ Google AI Studio!")
 
     # ------------------------------------------------------------------
     # Hybrid Command: !ai <question>
