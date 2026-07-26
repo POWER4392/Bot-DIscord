@@ -17,7 +17,8 @@ MAX_HISTORY_PER_USER = 20
 class AIChatbot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.api_key = os.getenv("GEMINI_API_KEY")
+        from core.shared import config
+        self.api_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
         self.model_name = "gemini-1.5-flash"
         self.model = None
 

@@ -171,7 +171,7 @@ def create_handle_api(bot):
             })
 
         elif action == "GET_AI_STATUS":
-            gemini_key = os.environ.get("GEMINI_API_KEY", "")
+            gemini_key = os.environ.get("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or ""
             return web.json_response({
                 "ok": True,
                 "gemini_api_configured": gemini_key != "",
@@ -187,6 +187,19 @@ def create_handle_api(bot):
                 payload = data.get("payload", {})
                 config["ai_channel_id"] = payload.get("ai_channel_id", config.get("ai_channel_id", ""))
                 config["ai_system_prompt"] = payload.get("ai_system_prompt", config.get("ai_system_prompt", ""))
+                
+                new_key = payload.get("gemini_api_key") or payload.get("gemini_key")
+                if new_key:
+                    new_key = new_key.strip()
+                    config["gemini_api_key"] = new_key
+                    os.environ["GEMINI_API_KEY"] = new_key
+                    ai_cog = bot.cogs.get("AIChatbot")
+                    if ai_cog:
+                        import google.generativeai as genai
+                        ai_cog.api_key = new_key
+                        genai.configure(api_key=new_key)
+                        ai_cog.model = genai.GenerativeModel(ai_cog.model_name)
+                        print("[API] Đã cập nhật động Gemini API Key thành công.")
 
                 with open(config_file, "w", encoding="utf-8") as f:
                     json.dump(config, f, indent=4, ensure_ascii=False)
