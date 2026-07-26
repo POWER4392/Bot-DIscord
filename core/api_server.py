@@ -199,17 +199,19 @@ def create_handle_api(bot):
                 config["ai_system_prompt"] = payload.get("ai_system_prompt", config.get("ai_system_prompt", ""))
                 
                 new_key = payload.get("gemini_api_key") or payload.get("gemini_key")
-                if new_key:
-                    new_key = new_key.strip()
+                if new_key and str(new_key).strip():
+                    new_key = str(new_key).strip()
                     config["gemini_api_key"] = new_key
                     os.environ["GEMINI_API_KEY"] = new_key
                     ai_cog = bot.cogs.get("AIChatbot")
                     if ai_cog:
-                        import google.generativeai as genai
                         ai_cog.api_key = new_key
-                        genai.configure(api_key=new_key)
-                        ai_cog.model = genai.GenerativeModel(ai_cog.model_name)
-                        print("[API] Đã cập nhật động Gemini API Key thành công.")
+                        ai_cog.model = None
+                        success = ai_cog.ensure_model_initialized()
+                        if success:
+                            print(f"[API] Đã cập nhật động Gemini API Key thành công. (Model: {ai_cog.model_name})")
+                        else:
+                            print("[API Warning] Cập nhật Key nhưng không khởi tạo được mô hình AI.")
 
                 with open(config_file, "w", encoding="utf-8") as f:
                     json.dump(config, f, indent=4, ensure_ascii=False)

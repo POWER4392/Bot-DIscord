@@ -671,8 +671,20 @@ def push_config_remote():
     
     global cfg
     cfg = load_current_config()
+    
+    url = prof.get("remote_api_url", "").strip()
+    if url and "http" in url:
+        resp = _remote_request("UPDATE_CONFIG", cfg)
+        if resp and resp.get("ok"):
+            messagebox.showinfo("Thành công", "Đã lưu và đẩy cấu hình (bao gồm Gemini API Key) lên Bot Cloud thành công!")
+            ping_remote()
+        else:
+            err = resp.get("error", "Không thể kết nối đến API Server") if resp else "Lỗi mạng hoặc sai API Key"
+            messagebox.showwarning("Cảnh báo Remote", f"Đã lưu cục bộ nhưng không thể đẩy lên Cloud API:\n{err}")
+    else:
+        messagebox.showinfo("Thành công", "Đã lưu cấu hình cục bộ thành công!")
+
     update_server_comboboxes()
-    messagebox.showinfo("Thành công", "Đã lưu và tải cấu hình mới từ Bot!")
 
 btn_row = ctk.CTkFrame(fr, fg_color="transparent")
 btn_row.pack(pady=(4,14), padx=20, fill="x")
