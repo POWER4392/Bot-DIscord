@@ -22,6 +22,19 @@ class AIChatbot(commands.Cog):
         self.model_name = "gemini-1.5-flash"
         self.model = None
 
+        # In-memory chat sessions: {(guild_id, user_id): genai.ChatSession}
+        self.chat_sessions: dict = {}
+
+        # Anti-Spam Sliding Window: {user_id: [timestamps]}
+        self.user_message_timestamps: dict = {}
+        # Duplicate detector: {user_id: {"content": str, "count": int}}
+        self.user_last_message: dict = {}
+
+        # Spam configurations
+        self.rate_limit_window = 5.0
+        self.max_messages_in_window = 5
+        self.max_duplicates = 3
+
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
@@ -45,19 +58,6 @@ class AIChatbot(commands.Cog):
             except Exception as e:
                 print(f"[AI Error] Loi khi cau hinh lai Gemini: {e}")
         return False
-
-        # In-memory chat sessions: {(guild_id, user_id): genai.ChatSession}
-        self.chat_sessions: dict = {}
-
-        # Anti-Spam Sliding Window: {user_id: [timestamps]}
-        self.user_message_timestamps: dict = {}
-        # Duplicate detector: {user_id: {"content": str, "count": int}}
-        self.user_last_message: dict = {}
-
-        # Spam configurations
-        self.rate_limit_window = 5.0
-        self.max_messages_in_window = 5
-        self.max_duplicates = 3
 
     # ------------------------------------------------------------------
     # Helper: lấy hoặc tạo chat session cho (guild_id, user_id)
@@ -361,17 +361,24 @@ class AIChatbot(commands.Cog):
                     reply_text = response.text
                 else:
                     # Đàm thoại văn bản thuần qua Session
-                    session = self._get_session(guild_id, user_id, system_prompt)
-
-                    # Lưu tin nhắn user vào DB (chỉ lưu tin nhắn gốc để lịch sử sạch sẽ)
                     self._save_message_to_db(guild_id, user_id, "user", content)
 
-                    # Gọi Gemini (bất đồng bộ qua executor)
-                    response = await self.bot.loop.run_in_executor(
-                        None,
-                        lambda: session.send_message(prompt_with_rag)
-                    )
-                    reply_text = response.text
+                    try:
+                        session = self._get_session(guild_id, user_id, system_prompt)
+                        response = await self.bot.loop.run_in_executor(
+                            None,
+                            lambda: session.send_message(prompt_with_rag)
+                        )
+                        reply_text = response.text
+                    except Exception as ex:
+                        print(f"[AI Session Warning] Lỗi session chat, chuyển sang generate_content: {ex}")
+                        # Xóa session bị lỗi và gọi trực tiếp qua model
+                        self.chat_sessions.pop((guild_id, user_id), None)
+                        response = await self.bot.loop.run_in_executor(
+                            None,
+                            lambda: self.model.generate_content(f"{system_prompt}\n\n{prompt_with_rag}")
+                        )
+                        reply_text = response.text
 
                 latency_ms = int((time.time() - start_time) * 1000)
 
