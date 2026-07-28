@@ -61,12 +61,10 @@ YDL_OPTIONS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': [
-            'player_client=ios,android,web'
+            'player_client=tv_embedded,ios,mweb'
         ]
     }
 }
-if os.path.exists("cookies.txt"):
-    YDL_OPTIONS['cookiefile'] = "cookies.txt"
 import shutil
 
 def get_ffmpeg_executable():
