@@ -202,19 +202,22 @@ class Music(commands.Cog):
                     return ydl.extract_info(query, download=False)
             except Exception as primary_e:
                 print(f"[YouTube Primary Failed] {primary_e}. Đang kích hoạt Cloud Fallback Engine...")
-                fb_opts = dict(YDL_OPTIONS)
-                fb_opts['extractor_args'] = {'youtube': ['player_client=android,ios']}
-                try:
-                    with yt_dlp.YoutubeDL(fb_opts) as ydl_fb:
-                        return ydl_fb.extract_info(query, download=False)
-                except Exception:
-                    sc_query = raw_search if raw_search.startswith("http") else f"scsearch1:{raw_search}"
+                song_title = raw_search
+                if raw_search.startswith("http") and ("youtube.com" in raw_search or "youtu.be" in raw_search):
                     try:
-                        sc_opts = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'no_warnings': True}
-                        with yt_dlp.YoutubeDL(sc_opts) as ydl_sc:
-                            return ydl_sc.extract_info(sc_query, download=False)
-                    except Exception:
-                        raise primary_e
+                        r = requests.get(f"https://www.youtube.com/oembed?url={raw_search}&format=json", timeout=5)
+                        if r.status_code == 200:
+                            t = r.json().get('title')
+                            if t: song_title = t
+                    except Exception: pass
+                    
+                sc_query = f"scsearch1:{song_title}" if not (song_title.startswith("http") and "soundcloud.com" in song_title) else song_title
+                try:
+                    sc_opts = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'no_warnings': True}
+                    with yt_dlp.YoutubeDL(sc_opts) as ydl_sc:
+                        return ydl_sc.extract_info(sc_query, download=False)
+                except Exception:
+                    raise primary_e
                 
         try:
             results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
