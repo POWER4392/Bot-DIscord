@@ -151,6 +151,9 @@ def create_handle_api(bot):
                 config.clear()
                 config.update(new_config)
                 
+                from core.shared import update_bot_command_names
+                update_bot_command_names(bot)
+                
                 g_key = config.get("gemini_api_key") or config.get("gemini_key")
                 if g_key:
                     os.environ["GEMINI_API_KEY"] = str(g_key).strip()

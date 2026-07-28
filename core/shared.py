@@ -80,3 +80,50 @@ def is_mod():
         user_role_ids = [r.id for r in ctx.author.roles]
         return any(int(m) in user_role_ids for m in mod_role_ids)
     return commands.check(predicate)
+
+def update_bot_command_names(bot):
+    """Cập nhật tên lệnh & aliases linh hoạt trên bot instance mà không cần restart."""
+    if not bot:
+        return
+    mapping = {
+        "play": config.get("cmd_play", "play") or "play",
+        "stop": config.get("cmd_stop", "stop") or "stop",
+        "skip": config.get("cmd_skip", "skip") or "skip",
+        "pause": config.get("cmd_pause", "pause") or "pause",
+        "resume": config.get("cmd_resume", "resume") or "resume",
+        "ping": config.get("cmd_ping", "ping") or "ping",
+        "warn": config.get("cmd_warn", "warn") or "warn",
+        "timed_role": config.get("cmd_timed_role", "timed_role") or "timed_role",
+        "kick": config.get("cmd_kick", "kick") or "kick",
+        "mute": config.get("cmd_mute", "mute") or "mute",
+        "ban": config.get("cmd_ban", "ban") or "ban",
+        "clear": config.get("cmd_clear", "clear") or "clear",
+        "addword": config.get("cmd_addword", "addword") or "addword",
+        "delword": config.get("cmd_delword", "delword") or "delword",
+        "profile_cmd": config.get("cmd_profile", "profile") or "profile",
+        "profile": config.get("cmd_profile", "profile") or "profile",
+        "setup_voice": config.get("cmd_setup_voice", "setup_voice") or "setup_voice",
+        "ticket_setup": config.get("cmd_ticket_setup", "ticket_setup") or "ticket_setup",
+    }
+    
+    try:
+        for cmd in list(bot.commands):
+            cb_name = getattr(cmd.callback, "__name__", cmd.name)
+            default_key = cb_name.replace("_cmd", "")
+            target_name = mapping.get(cb_name) or mapping.get(default_key)
+            
+            if target_name:
+                old_name = cmd.name
+                if old_name in bot.all_commands and bot.all_commands[old_name] == cmd:
+                    del bot.all_commands[old_name]
+                
+                cmd.name = target_name
+                if default_key != target_name and default_key not in cmd.aliases:
+                    cmd.aliases = list(set(list(cmd.aliases) + [default_key]))
+                
+                bot.all_commands[target_name] = cmd
+                for alias in cmd.aliases:
+                    bot.all_commands[alias] = cmd
+    except Exception as e:
+        print(f"[CMD UPDATE ERROR] Không thể cập nhật tên lệnh: {e}")
+

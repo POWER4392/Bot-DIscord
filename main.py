@@ -218,6 +218,8 @@ def register_bot_events(b):
     @b.event
     async def on_ready():
         print(f'[THONG BAO] Bot {b.user} da Started thanh cong!')
+        from core.shared import update_bot_command_names
+        update_bot_command_names(b)
         if not check_timed_roles.is_running():
             check_timed_roles.start()
         if not check_gui_tasks.is_running():

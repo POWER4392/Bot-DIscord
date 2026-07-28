@@ -363,7 +363,6 @@ def save_settings():
         cfg["cmd_timed_role"] = entry_cmd_timed_role.get()
 
         cfg["cmd_profile"] = entry_cmd_profile.get()
-        cfg["cmd_rank"] = entry_cmd_rank.get()
         cfg["cmd_setup_voice"] = entry_cmd_setup_voice.get()
         cfg["cmd_ticket_setup"] = entry_cmd_ticket_setup.get()
         
@@ -428,22 +427,23 @@ def save_settings():
         if url and "http" in url:
             resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
             if not resp or not resp.get("ok"):
-                err_msg = resp.get("error") if resp else "Mất kết nối đến Cloud API"
-                messagebox.showwarning("Cảnh báo Cloud Server", f"Đã lưu cấu hình cục bộ nhưng chưa đẩy được lên Cloud:\n{err_msg}")
-        return True
+                err_msg = resp.get("error") if resp else "Không thể kết nối đến Cloud API (Sai URL, sai Secret Key hoặc Server Cloud chưa bật)"
+                return False, err_msg
+            return True, "cloud"
+        return True, "local"
     except Exception as e:
-        messagebox.showerror("Lỗi", str(e))
-        return False
+        return False, str(e)
 
 def save_and_reset():
-    if save_settings():
-        active = gui_settings["active_profile"]
-        profile = gui_settings["profiles"].get(active)
-        if profile:
-            url = profile.get("remote_api_url", "").strip().rstrip("/")
-            if url and "http" in url:
-                messagebox.showinfo("Thành công", "Đã lưu cấu hình lên Cloud thành công!")
-                return
+    ok, mode_or_err = save_settings()
+    if not ok:
+        messagebox.showerror("Lỗi Đồng Bộ Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Server Cloud:\n\n❌ {mode_or_err}")
+        return
+        
+    if mode_or_err == "cloud":
+        messagebox.showinfo("Thành Công Cloud", "Đã lưu và đồng bộ thành công toàn bộ dữ liệu cấu hình lên Cloud Server!")
+    else:
+        messagebox.showinfo("Thành Công Local", "Đã lưu cấu hình cục bộ thành công!")
         start_bot()
 
 # --- GIAO DIỆN CHÍNH ---
@@ -493,7 +493,6 @@ def reload_gui_inputs():
     entry_cmd_timed_role.delete(0, tk.END); entry_cmd_timed_role.insert(0, cfg.get("cmd_timed_role", "timed_role"))
     
     entry_cmd_profile.delete(0, tk.END); entry_cmd_profile.insert(0, cfg.get("cmd_profile", "profile"))
-    entry_cmd_rank.delete(0, tk.END); entry_cmd_rank.insert(0, cfg.get("cmd_rank", "rank"))
     entry_cmd_setup_voice.delete(0, tk.END); entry_cmd_setup_voice.insert(0, cfg.get("cmd_setup_voice", "setup_voice"))
     entry_cmd_ticket_setup.delete(0, tk.END); entry_cmd_ticket_setup.insert(0, cfg.get("cmd_ticket_setup", "ticket_setup"))
     
@@ -744,7 +743,6 @@ def ping_remote():
     threading.Thread(target=task, daemon=True).start()
 
 def push_config_remote():
-    if not save_settings(): return
     active = gui_settings["active_profile"]
     prof = gui_settings["profiles"][active]
     prof["remote_api_url"] = entry_remote_url.get().strip()
@@ -752,17 +750,18 @@ def push_config_remote():
     with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(gui_settings, f, indent=4, ensure_ascii=False)
     global cfg; cfg = load_current_config()
+    
     url = prof.get("remote_api_url", "").strip()
-    if url and "http" in url:
-        resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
-        if resp and resp.get("ok"):
-            messagebox.showinfo("Thành công", "Đã lưu và đẩy toàn bộ dữ liệu Bot lên Server Cloud thành công!")
-            ping_remote()
-        else:
-            err = resp.get("error", "Không thể kết nối") if resp else "Lỗi mạng hoặc sai API Key"
-            messagebox.showwarning("Cảnh báo Cloud", f"Đã lưu cục bộ nhưng không thể đẩy lên Cloud Server:\n{err}")
-    else:
-        messagebox.showinfo("Đã lưu", "Đã lưu cấu hình cục bộ thành công! (Nhập API URL để đẩy lên Cloud Server)")
+    if not url or "http" not in url:
+        messagebox.showwarning("Cảnh Báo", "Vui lòng nhập địa chỉ API Cloud Server (ví dụ: http://12.34.56.78:8080) trước khi đẩy dữ liệu!")
+        return
+
+    ok, mode_or_err = save_settings()
+    if ok and mode_or_err == "cloud":
+        messagebox.showinfo("Thành Công Cloud", "Đã lưu và đẩy thành công toàn bộ dữ liệu cấu hình lên Cloud Server!")
+        ping_remote()
+    elif not ok:
+        messagebox.showerror("Lỗi Đẩy Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Cloud Server:\n\n❌ {mode_or_err}")
     update_server_comboboxes()
 
 _cloud_btns = ctk.CTkFrame(fr, fg_color="transparent")
@@ -860,7 +859,6 @@ fcmd_eco_l = ctk.CTkFrame(fcmd_eco, fg_color="transparent"); fcmd_eco_l.pack(sid
 fcmd_eco_r = ctk.CTkFrame(fcmd_eco, fg_color="transparent"); fcmd_eco_r.pack(side="left", fill="both", expand=True)
 
 entry_cmd_profile = mki_grid(fcmd_eco_l, "🏆 Profile:", "cmd_profile", "profile")
-entry_cmd_rank = mki_grid(fcmd_eco_l, "📊 Rank:", "cmd_rank", "rank")
 
 entry_cmd_setup_voice = mki_grid(fcmd_eco_r, "🎙️ Setup Voice:", "cmd_setup_voice", "setup_voice")
 entry_cmd_ticket_setup = mki_grid(fcmd_eco_r, "🎫 Setup Ticket:", "cmd_ticket_setup", "ticket_setup")
