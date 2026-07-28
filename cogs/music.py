@@ -146,7 +146,7 @@ class Music(commands.Cog):
                     await status_msg.edit(content="⏸️ Hàng đợi trống. (Tạm tắt đề xuất do cạn kho nhạc tương thích).")
                 asyncio.run_coroutine_threadsafe(auto_play_task(), self.bot.loop)
 
-    @commands.hybrid_command(name=config.get("cmd_play", "play") or "play")
+    @commands.hybrid_command(name=config.get("cmd_play", "play") or "play", aliases=["p"], description="Phát nhạc từ YouTube, SoundCloud...")
     async def play(self, ctx, *, search: str):
         if not ctx.author.voice: return await ctx.send("❌ Vào voice đi bạn ơi!")
         
