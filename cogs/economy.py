@@ -1,13 +1,10 @@
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
-import requests
 import random
-import os
 import time
 from core.shared import config, level_cooldown
 from core.database import cursor, db_lock, db_get_user, db_update_xp, xp_for_level, level_for_xp
+
 
 class Economy(commands.Cog):
     def __init__(self, bot):
@@ -68,68 +65,6 @@ class Economy(commands.Cog):
         embed.description = desc
         embed.set_footer(text=f"Top 10 thành viên tích cực nhất · {ctx.guild.name}")
         await ctx.send(embed=embed)
-
-    @commands.hybrid_command(name=config.get("cmd_rank", "rank") or "rank")
-    async def rank(self, ctx, member: discord.Member = None):
-        member = member or ctx.author
-        guild_id = str(ctx.guild.id)
-        user_id = str(member.id)
-        
-        current_data = await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
-        xp, level = current_data[0], current_data[1]
-        
-        current_lvl_xp = xp_for_level(level)
-        next_lvl_xp = xp_for_level(level + 1)
-        
-        sorted_users = []
-        def fetch_sorted_users():
-            with db_lock:
-                cursor.execute("SELECT user_id, xp FROM users WHERE guild_id=? ORDER BY xp DESC", (guild_id,))
-                return cursor.fetchall()
-        sorted_users = await self.bot.loop.run_in_executor(None, fetch_sorted_users)
-            
-        rank_pos = next((i + 1 for i, row in enumerate(sorted_users) if row[0] == str(member.id)), "?")
-
-        async with ctx.typing():
-            bg = Image.new("RGBA", (800, 250), (43, 45, 49, 255))
-            try:
-                def _fetch_avatar():
-                    return requests.get(member.display_avatar.url, timeout=10)
-                avatar_resp = await self.bot.loop.run_in_executor(None, _fetch_avatar)
-                avatar = Image.open(BytesIO(avatar_resp.content)).convert("RGBA").resize((180, 180))
-                mask = Image.new("L", (180, 180), 0)
-                ImageDraw.Draw(mask).ellipse((0, 0, 180, 180), fill=255)
-                bg.paste(avatar, (35, 35), mask)
-            except Exception as e:
-                print(f"[Rank] Loi tai avatar: {e}")
-            
-            draw = ImageDraw.Draw(bg)
-            try: 
-                font_path = config.get("servers", {}).get(guild_id, {}).get("font_file", "")
-                if not os.path.exists(font_path): raise Exception
-                font_l, font_s = ImageFont.truetype(font_path, 48), ImageFont.truetype(font_path, 28)
-            except: 
-                font_l = font_s = ImageFont.load_default()
-            
-            draw.text((250, 40), str(member.name), font=font_l, fill=(255, 255, 255))
-            draw.text((250, 100), f"Rank: #{rank_pos}  |  Level: {level}", font=font_s, fill=(185, 187, 190))
-            
-            bar_x, bar_y, bar_w, bar_h = 250, 170, 500, 30
-            draw.rounded_rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h), radius=15, fill=(64, 68, 75))
-            
-            xp_in_level = max(0, xp - current_lvl_xp)
-            xp_needed = max(1, next_lvl_xp - current_lvl_xp)
-            progress = min(1.0, xp_in_level / xp_needed)
-            fill_w = max(30, int(bar_w * progress)) if progress > 0 else 0
-            if fill_w > 0:
-                draw.rounded_rectangle((bar_x, bar_y, bar_x + fill_w, bar_y + bar_h), radius=15, fill=(88, 101, 242))
-            
-            draw.text((bar_x + bar_w - 200, bar_y - 35), f"{xp:,} / {next_lvl_xp:,} XP", font=font_s, fill=(255, 255, 255))
-
-            with BytesIO() as image_binary:
-                bg.save(image_binary, "PNG")
-                image_binary.seek(0)
-                await ctx.send(file=discord.File(fp=image_binary, filename="rank.png"))
 
     @commands.hybrid_command(name=config.get("cmd_profile", "profile") or "profile")
     async def profile_cmd(self, ctx, member: discord.Member = None):
