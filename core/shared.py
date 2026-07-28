@@ -62,6 +62,32 @@ YDL_OPTIONS = {
 }
 if os.path.exists("cookies.txt"):
     YDL_OPTIONS['cookiefile'] = "cookies.txt"
+import shutil
+
+def get_ffmpeg_executable():
+    path = str(config.get("ffmpeg_path", "")).strip()
+    
+    if os.name == 'nt':
+        if path and not path.startswith("/") and os.path.exists(path):
+            return path
+        if os.path.exists("./ffmpeg.exe"):
+            return "./ffmpeg.exe"
+        if os.path.exists("ffmpeg.exe"):
+            return "ffmpeg.exe"
+        system_ffmpeg = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+        if system_ffmpeg:
+            return system_ffmpeg
+        return "./ffmpeg.exe"
+    else:
+        if path and os.path.exists(path):
+            return path
+        system_ffmpeg = shutil.which("ffmpeg")
+        if system_ffmpeg:
+            return system_ffmpeg
+        if os.path.exists("/usr/bin/ffmpeg"):
+            return "/usr/bin/ffmpeg"
+        return "ffmpeg"
+
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
 PLATFORM_EMOJI = {"youtube": "▶️", "reddit": "🟧", "tiktok": "🎵", "facebook": "🔵"}
 

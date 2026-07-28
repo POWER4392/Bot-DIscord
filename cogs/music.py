@@ -5,7 +5,7 @@ import asyncio
 import random
 import re
 import requests
-from core.shared import config, music_queues, play_history, autoplay_disabled, YDL_OPTIONS, FFMPEG_OPTIONS
+from core.shared import config, music_queues, play_history, autoplay_disabled, YDL_OPTIONS, FFMPEG_OPTIONS, get_ffmpeg_executable
 
 class MusicControlView(discord.ui.View):
     def __init__(self): 
@@ -112,7 +112,7 @@ class Music(commands.Cog):
             info = music_queues[guild_id].pop(0)
             play_history[guild_id] = info
             try:
-                source = discord.FFmpegPCMAudio(info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
+                source = discord.FFmpegPCMAudio(info['url'], executable=get_ffmpeg_executable(), **FFMPEG_OPTIONS)
                 ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
                 coro = ctx.channel.send(embed=make_music_embed(info, "Hàng Đợi Kế Tiếp"), view=MusicControlView())
                 asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
@@ -137,7 +137,7 @@ class Music(commands.Cog):
                                 next_info = random.choice(candidates)
                                 play_history[guild_id] = next_info
                                 if ctx.voice_client:
-                                    source = discord.FFmpegPCMAudio(next_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
+                                    source = discord.FFmpegPCMAudio(next_info['url'], executable=get_ffmpeg_executable(), **FFMPEG_OPTIONS)
                                     ctx.voice_client.play(source, after=lambda e: self.play_next(ctx))
                                     await status_msg.edit(content=None, embed=make_music_embed(next_info, "🎵 Nhạc Đề Xuất (AutoPlay)"), view=MusicControlView())
                                     return
@@ -247,9 +247,13 @@ class Music(commands.Cog):
             play_history[guild_id] = first_info
             
             try:
-                source = discord.FFmpegPCMAudio(first_info['url'], executable=config.get("ffmpeg_path", "./ffmpeg.exe"), **FFMPEG_OPTIONS)
+                ffmpeg_bin = get_ffmpeg_executable()
+                source = discord.FFmpegPCMAudio(first_info['url'], executable=ffmpeg_bin, **FFMPEG_OPTIONS)
                 vc.play(source, after=lambda e: self.play_next(ctx))
             except Exception as e:
+                import os
+                if os.name == 'nt' and not os.path.exists(ffmpeg_bin) and not shutil.which("ffmpeg"):
+                    return await status_msg.edit(content="❌ **Thiếu file `ffmpeg.exe` trên máy Local Windows!**\n👉 Bạn cần tải file `ffmpeg.exe` đặt vào thư mục gốc của Bot (`d:\\Code\\Bot\\ffmpeg.exe`).")
                 return await status_msg.edit(content=f"❌ Lỗi khởi chạy phát nhạc qua FFmpeg: {e}\n👉 Vui lòng kiểm tra lại đường dẫn ffmpeg hoặc link nhạc.")
                 
             try:
