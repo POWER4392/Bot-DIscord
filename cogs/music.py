@@ -5,6 +5,7 @@ import asyncio
 import random
 import re
 import requests
+import shutil
 from core.shared import config, music_queues, play_history, autoplay_disabled, YDL_OPTIONS, FFMPEG_OPTIONS, get_ffmpeg_executable
 
 class MusicControlView(discord.ui.View):
