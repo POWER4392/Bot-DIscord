@@ -197,7 +197,7 @@ class Music(commands.Cog):
                 except Exception:
                     pass  # Fallback to normal URL handling if oEmbed fails
 
-            query = f"scsearch:{search}" if not search.startswith("http") else search
+            query = f"ytsearch1:{search}" if not search.startswith("http") else search
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
                 
         try:
