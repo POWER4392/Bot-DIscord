@@ -33,6 +33,10 @@ intents.voice_states = True
 intents.presences = True
 proxy = os.environ.get("DISCORD_PROXY") or config.get("proxy") or None
 
+def get_prefix(bot, message):
+    p = config.get("prefix", "!") or "!"
+    return commands.when_mentioned_or(p)(bot, message)
+
 def create_bot():
     """Tạo một Bot instance mới hoàn toàn (aiohttp session mới) để tránh lỗi 'Session is closed'."""
     _intents = discord.Intents.default()
@@ -40,14 +44,14 @@ def create_bot():
     _intents.members = True
     _intents.voice_states = True
     _intents.presences = True
-    p = config.get("prefix", ".")
     _bot = commands.Bot(
-        command_prefix=commands.when_mentioned_or(p, "!", "."),
+        command_prefix=get_prefix,
         intents=_intents,
         proxy=proxy
     )
     _bot.remove_command('help')
     return _bot
+
 
 # Bot instance được tạo ban đầu, sẽ được thay thế sau mỗi lần kết nối thất bại
 bot = create_bot()

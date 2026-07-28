@@ -421,15 +421,15 @@ def save_settings():
             sc["boost_message"] = entry_boost_msg.get().strip() or "🚀 **{mention}** vừa boost server! Cảm ơn vì sự ủng hộ của bạn! 💜"
             sc["rr_title"] = entry_rr_title.get()
 
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=4, ensure_ascii=False)
+
         url = profile.get("remote_api_url", "").strip().rstrip("/")
         if url and "http" in url:
             resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
             if not resp or not resp.get("ok"):
-                messagebox.showerror("Lỗi", "Không thể lưu cấu hình lên Bot: " + (resp.get("error") if resp else "Mất kết nối"))
-                return False
-        else:
-            with open(config_file, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=4, ensure_ascii=False)
+                err_msg = resp.get("error") if resp else "Mất kết nối đến Cloud API"
+                messagebox.showwarning("Cảnh báo Cloud Server", f"Đã lưu cấu hình cục bộ nhưng chưa đẩy được lên Cloud:\n{err_msg}")
         return True
     except Exception as e:
         messagebox.showerror("Lỗi", str(e))
@@ -673,41 +673,7 @@ entry_gemini_key = make_secret_field(fc_secret, "🧠  GEMINI AI API KEY:", "gem
 entry_api_port   = mki(fc_secret, "🔌  LOCAL API PORT (Webserver):", "api_port", "8080")
 ctk.CTkFrame(fc_secret, fg_color="transparent", height=4).pack()
 
-# — 2. Lệnh tùy biến (Prefix) —
-fc_prefix = ctk.CTkFrame(sf_local, fg_color="#1F2010", corner_radius=10,
-                          border_width=1, border_color="#FEE75C")
-fc_prefix.pack(fill="x", padx=5, pady=4)
-_ph = ctk.CTkFrame(fc_prefix, fg_color="transparent")
-_ph.pack(fill="x", padx=14, pady=(8, 0))
-ctk.CTkLabel(_ph, text="✏️  LỆNH TÙY BIẾN",
-             font=("Segoe UI", 13, "bold"), text_color="#FEE75C").pack(side="left")
-ctk.CTkLabel(_ph, text="Tiền tố đứng trước tất cả lệnh Bot",
-             font=("Segoe UI", 10), text_color="#72767D").pack(side="left", padx=(10, 0))
-ctk.CTkLabel(fc_prefix,
-             text="Có thể là 1 ký tự hoặc nhiều ký tự (ví dụ: !  /  m.  ./  bot.)",
-             font=("Segoe UI", 10), text_color="#B5BAC1").pack(anchor="w", padx=14, pady=(3, 0))
-_pr = ctk.CTkFrame(fc_prefix, fg_color="transparent")
-_pr.pack(fill="x", padx=14, pady=(6, 4))
-ctk.CTkLabel(_pr, text="TIỀN TỐ:", font=("Segoe UI", 11, "bold")).pack(side="left")
-entry_prefix = ctk.CTkEntry(_pr, width=96, height=34, font=("Segoe UI", 18, "bold"), placeholder_text="!")
-entry_prefix.insert(0, str(cfg.get("prefix", "!")))
-entry_prefix.pack(side="left", padx=(8, 14))
-_pfx_ex = ctk.StringVar(value=f"{cfg.get('prefix','!')}play  ·  {cfg.get('prefix','!')}skip  ·  {cfg.get('prefix','!')}ban")
-ctk.CTkLabel(_pr, textvariable=_pfx_ex, font=("Segoe UI", 11, "bold"), text_color="#57F287").pack(side="left")
-def _upd_pfx(*_):
-    v = entry_prefix.get() or "!"
-    _pfx_ex.set(f"{v}play  ·  {v}skip  ·  {v}ban")
-entry_prefix.bind("<KeyRelease>", _upd_pfx)
-_prow = ctk.CTkFrame(fc_prefix, fg_color="transparent")
-_prow.pack(fill="x", padx=14, pady=(0, 10))
-ctk.CTkLabel(_prow, text="Chọn nhanh:", font=("Segoe UI", 10), text_color="#72767D").pack(side="left")
-for _pv in ["!", "/", ".", ">", "$", "m.", "./"]:
-    def _mp(v):
-        def _s(): entry_prefix.delete(0, "end"); entry_prefix.insert(0, v); _upd_pfx()
-        return _s
-    ctk.CTkButton(_prow, text=_pv, width=44, height=26,
-                   fg_color="#3A3D42", hover_color="#5865F2",
-                   font=("Segoe UI", 12, "bold"), command=_mp(_pv)).pack(side="left", padx=2)
+
 fc_local_ctrl = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
                                border_width=1, border_color="#23A559")
 fc_local_ctrl.pack(fill="x", padx=5, pady=(4, 10))
@@ -808,7 +774,41 @@ ctk.CTkButton(_cloud_btns, text="⬆️  ĐẨY TẤT CẢ DỮ LIỆU LÊN CLOU
                fg_color="#F1A000", hover_color="#D4900A", text_color="black",
                font=("Segoe UI", 12, "bold"), command=push_config_remote).pack(side="left", padx=4)
 
-ctk.CTkFrame(sf_cloud, fg_color="transparent", height=14).pack()
+# — 1. Tiền tố Lệnh (Prefix) —
+fc_prefix = ctk.CTkFrame(sf_cmds, fg_color="#1F2010", corner_radius=10,
+                          border_width=1, border_color="#FEE75C")
+fc_prefix.pack(fill="x", padx=10, pady=(10, 4))
+_ph = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+_ph.pack(fill="x", padx=14, pady=(8, 0))
+ctk.CTkLabel(_ph, text="✏️  TIỀN TỐ LỆNH BOT (PREFIX)",
+             font=("Segoe UI", 13, "bold"), text_color="#FEE75C").pack(side="left")
+ctk.CTkLabel(_ph, text="Ký tự đứng trước các lệnh tùy biến",
+             font=("Segoe UI", 10), text_color="#72767D").pack(side="left", padx=(10, 0))
+ctk.CTkLabel(fc_prefix,
+             text="Có thể là 1 ký tự hoặc nhiều ký tự (ví dụ: !  /  m.  ./  bot.)",
+             font=("Segoe UI", 10), text_color="#B5BAC1").pack(anchor="w", padx=14, pady=(3, 0))
+_pr = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+_pr.pack(fill="x", padx=14, pady=(6, 4))
+ctk.CTkLabel(_pr, text="TIỀN TỐ:", font=("Segoe UI", 11, "bold")).pack(side="left")
+entry_prefix = ctk.CTkEntry(_pr, width=96, height=34, font=("Segoe UI", 18, "bold"), placeholder_text="!")
+entry_prefix.insert(0, str(cfg.get("prefix", "!")))
+entry_prefix.pack(side="left", padx=(8, 14))
+_pfx_ex = ctk.StringVar(value=f"{cfg.get('prefix','!')}play  ·  {cfg.get('prefix','!')}skip  ·  {cfg.get('prefix','!')}ban")
+ctk.CTkLabel(_pr, textvariable=_pfx_ex, font=("Segoe UI", 11, "bold"), text_color="#57F287").pack(side="left")
+def _upd_pfx(*_):
+    v = entry_prefix.get() or "!"
+    _pfx_ex.set(f"{v}play  ·  {v}skip  ·  {v}ban")
+entry_prefix.bind("<KeyRelease>", _upd_pfx)
+_prow = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+_prow.pack(fill="x", padx=14, pady=(0, 10))
+ctk.CTkLabel(_prow, text="Chọn nhanh:", font=("Segoe UI", 10), text_color="#72767D").pack(side="left")
+for _pv in ["!", "/", ".", ">", "$", "m.", "./"]:
+    def _mp(v):
+        def _s(): entry_prefix.delete(0, "end"); entry_prefix.insert(0, v); _upd_pfx()
+        return _s
+    ctk.CTkButton(_prow, text=_pv, width=44, height=26,
+                   fg_color="#3A3D42", hover_color="#5865F2",
+                   font=("Segoe UI", 12, "bold"), command=_mp(_pv)).pack(side="left", padx=2)
 
 fcmd_music = ctk.CTkFrame(sf_cmds, fg_color="#2B2D31", corner_radius=12)
 fcmd_music.pack(pady=10, fill="x", padx=10)
