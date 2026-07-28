@@ -203,16 +203,14 @@ class Music(commands.Cog):
             except Exception as primary_e:
                 print(f"[YouTube Primary Failed] {primary_e}. Đang kích hoạt Cloud Fallback Engine...")
                 fb_opts = dict(YDL_OPTIONS)
-                fb_opts['format'] = 'best/any'
-                fb_opts['extractor_args'] = {'youtube': ['player_client=mweb,android,web']}
+                fb_opts['extractor_args'] = {'youtube': ['player_client=android,ios']}
                 try:
                     with yt_dlp.YoutubeDL(fb_opts) as ydl_fb:
                         return ydl_fb.extract_info(query, download=False)
                 except Exception:
                     sc_query = raw_search if raw_search.startswith("http") else f"scsearch1:{raw_search}"
                     try:
-                        sc_opts = dict(YDL_OPTIONS)
-                        sc_opts.pop('extractor_args', None)
+                        sc_opts = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'no_warnings': True}
                         with yt_dlp.YoutubeDL(sc_opts) as ydl_sc:
                             return ydl_sc.extract_info(sc_query, download=False)
                     except Exception:

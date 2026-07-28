@@ -53,7 +53,7 @@ server_data = {}
 
 API_SECRET = config.get("api_secret", "changeme123")
 YDL_OPTIONS = {
-    'format': 'bestaudio/best/m4a/mp4/webm/140/251/18/any',
+    'format': 'bestaudio/best',
     'noplaylist': 'True',
     'quiet': True,
     'no_warnings': True,
@@ -61,14 +61,10 @@ YDL_OPTIONS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': [
-            'player_client=ios,mweb,web'
+            'player_client=ios,android'
         ]
     }
 }
-for c_path in ["config/.yt_cookies.data", "config/yt_session.dat", ".cookies.dat", "cookies.txt", "www.youtube.com_cookies.txt"]:
-    if os.path.exists(c_path):
-        YDL_OPTIONS['cookiefile'] = c_path
-        break
 import shutil
 
 def get_ffmpeg_executable():
