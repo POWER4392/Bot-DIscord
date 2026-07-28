@@ -65,6 +65,8 @@ YDL_OPTIONS = {
         ]
     }
 }
+if os.path.exists("cookies.txt"):
+    YDL_OPTIONS['cookiefile'] = "cookies.txt"
 import shutil
 
 def get_ffmpeg_executable():
