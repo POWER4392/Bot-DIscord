@@ -90,7 +90,7 @@ async def handle_health(request: web.Request):
         "bot_online": bot.is_ready(),
         "bot_user": str(bot.user) if bot.user else None,
         "guilds": len(bot.guilds),
-        "latency_ms": round(bot.latency * 1000) if bot.latency is not None and not math.isnan(bot.latency) else 0,
+        "latency_ms": round(bot.latency * 1000) if bot.latency is not None and not math.isnan(bot.latency) and not math.isinf(bot.latency) else 0,
         "uptime": f"{hours:02d}h {minutes:02d}m {seconds:02d}s",
         "uptime_seconds": uptime_seconds,
         "loaded_cogs": list(bot.cogs.keys()),
