@@ -201,9 +201,9 @@ class Music(commands.Cog):
                 with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                     return ydl.extract_info(query, download=False)
             except Exception as primary_e:
-                print(f"[YouTube Primary Failed] {primary_e}. Đang chuyển sang YouTube Backup Client...")
+                print(f"[YouTube Primary Failed] {primary_e}. Đang kích hoạt Backup Client...")
                 backup_opts = dict(YDL_OPTIONS)
-                backup_opts['extractor_args'] = {'youtube': ['player_client=mweb,android,web_creator']}
+                backup_opts['extractor_args'] = {'youtube': ['player_client=tv,mweb,ios']}
                 try:
                     with yt_dlp.YoutubeDL(backup_opts) as ydl_backup:
                         return ydl_backup.extract_info(query, download=False)
