@@ -342,9 +342,9 @@ def save_settings():
         config_file = profile.get("config_file", "config.json")
 
         cfg["token"] = entry_token.get().strip()
-        cfg["prefix"] = entry_prefix.get().strip()
+        _prefix_val = entry_prefix.get()  # KHÔNG strip() - ký tự đặc biệt cần giữ nguyên
+        cfg["prefix"] = _prefix_val if _prefix_val else "!"
         cfg["api_port"] = int(entry_api_port.get().strip()) if entry_api_port.get().strip().isdigit() else 8080
-        cfg["database_name"] = entry_database_name.get().strip() or "bot_core"
         cfg["gemini_api_key"] = entry_gemini_key.get().strip()
 
         cfg["cmd_play"] = entry_cmd_play.get()
@@ -473,7 +473,6 @@ def reload_gui_inputs():
     entry_token.delete(0, tk.END); entry_token.insert(0, cfg.get("token", ""))
     entry_prefix.delete(0, tk.END); entry_prefix.insert(0, cfg.get("prefix", "!"))
     entry_api_port.delete(0, tk.END); entry_api_port.insert(0, str(cfg.get("api_port", 8080)))
-    entry_database_name.delete(0, tk.END); entry_database_name.insert(0, cfg.get("database_name", "bot_core"))
     entry_gemini_key.delete(0, tk.END); entry_gemini_key.insert(0, cfg.get("gemini_api_key", os.environ.get("GEMINI_API_KEY", "")))
     
     entry_cmd_play.delete(0, tk.END); entry_cmd_play.insert(0, cfg.get("cmd_play", "play"))
@@ -583,7 +582,6 @@ def delete_profile():
             with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(gui_settings, f, indent=4, ensure_ascii=False)
         except: pass
-        
         combo_profiles.configure(values=list(gui_settings["profiles"].keys()))
         combo_profiles.set("Default")
         reload_gui_inputs()
@@ -599,11 +597,10 @@ current_server_data = {}
 tabview = ctk.CTkTabview(root)
 tabview.pack(fill="both", expand=True, padx=5, pady=5)
 tab_system = tabview.add("⚙️ HỆ THỐNG")
-tab_cmds = tabview.add("📝 LỆNH TÙY BIẺN")
+tab_cmds = tabview.add("📝 LỆNH TÙY BIỂN")
 tab_server = tabview.add("🌐 QUẢN LÝ SERVER")
 tab_social = tabview.add("📡 SOCIAL MEDIA")
-sf_system = ctk.CTkScrollableFrame(tab_system, fg_color="transparent")
-sf_system.pack(fill="both", expand=True)
+
 sf_cmds = ctk.CTkScrollableFrame(tab_cmds, fg_color="transparent")
 sf_cmds.pack(fill="both", expand=True)
 sf_server = ctk.CTkScrollableFrame(tab_server, fg_color="transparent")
@@ -611,41 +608,162 @@ sf_server.pack(fill="both", expand=True)
 sf_social = ctk.CTkScrollableFrame(tab_social, fg_color="transparent")
 sf_social.pack(fill="both", expand=True)
 
-# --- KHỐI TOÀN CẦU ---
-fc = ctk.CTkFrame(sf_system, fg_color="#2B2D31", corner_radius=12); fc.pack(pady=10, fill="x")
-ctk.CTkLabel(fc, text="⚙️ CẤU HÌNH BOT GLOBAL", font=("Segoe UI", 16, "bold")).pack(pady=10)
+# Create sub-tabview inside tab_system for 2 compartments: Local & Cloud
+sub_tabview = ctk.CTkTabview(tab_system)
+sub_tabview.pack(fill="both", expand=True, padx=2, pady=2)
+
+tab_local_tab = sub_tabview.add("💻 CẤU HÌNH LOCAL")
+tab_cloud_tab = sub_tabview.add("☁️ CẤU HÌNH CLOUD")
+
+sf_local = ctk.CTkScrollableFrame(tab_local_tab, fg_color="transparent")
+sf_local.pack(fill="both", expand=True)
+
+sf_cloud = ctk.CTkScrollableFrame(tab_cloud_tab, fg_color="transparent")
+sf_cloud.pack(fill="both", expand=True)
+
+# ——— Helper functions ———
+def make_secret_field(parent, label_text, cfg_key="", default="", initial_value=None, width=380):
+    """Tạo một ô nhập có nút 👁 ẩn/hiện ký tự."""
+    ctk.CTkLabel(parent, text=label_text, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=14, pady=(8, 0))
+    row = ctk.CTkFrame(parent, fg_color="transparent")
+    row.pack(fill="x", padx=14, pady=(2, 6))
+    val = initial_value if initial_value is not None else (str(cfg.get(cfg_key, default)) if cfg_key else default)
+    entry = ctk.CTkEntry(row, width=width, height=32, show="●")
+    entry.insert(0, val)
+    entry.pack(side="left")
+    _v = [False]
+    def _toggle():
+        if _v[0]:
+            entry.configure(show="●")
+            _btn.configure(text="👁")
+            _v[0] = False
+        else:
+            entry.configure(show="")
+            _btn.configure(text="🙈")
+            _v[0] = True
+    _btn = ctk.CTkButton(row, text="👁", width=36, height=32,
+                          fg_color="#3A3D42", hover_color="#4A4D52",
+                          font=("Segoe UI", 14), command=_toggle)
+    _btn.pack(side="left", padx=(5, 0))
+    return entry
+
 def mki(p, l, k, d=""):
-    ctk.CTkLabel(p, text=l, font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=20)
+    ctk.CTkLabel(p, text=l, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=14, pady=(6,0))
     e = ctk.CTkEntry(p, width=420, height=30)
     e.insert(0, str(cfg.get(k, d)))
-    e.pack(pady=(0,10), padx=20)
+    e.pack(anchor="w", padx=14, pady=(2,6))
     return e
-entry_token = mki(fc, "BOT TOKEN:", "token")
-entry_prefix = mki(fc, "PREFIX (Dấu bắt đầu lệnh):", "prefix", "!")
-entry_api_port = mki(fc, "CỔNG API (API PORT):", "api_port", "8080")
-entry_database_name = mki(fc, "TÊN DATABASE (DATABASE NAME):", "database_name", "bot_core")
-entry_gemini_key = mki(fc, "GEMINI AI API KEY (Khóa Chatbot AI):", "gemini_api_key", "")
 
-# --- REMOTE MODE (Kết nối Discloud / VPS) ---
-fr = ctk.CTkFrame(sf_system, fg_color="#1E2124", corner_radius=12, border_width=1, border_color="#F1C40F")
-fr.pack(pady=10, fill="x", padx=5)
-ctk.CTkLabel(fr, text="☁️ ĐIỀU KHIỂN BOT TỪ XA (DISCLOUD/VPS)", font=("Segoe UI", 15, "bold"), text_color="#F1C40F").pack(pady=10)
-ctk.CTkLabel(fr, text="Nhập địa chỉ Bot API (ví dụ: http://12.34.56.78:8080)", font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=20)
+# ==================================================================
+# ████  NGĂN 1: CẤU HÌNH LOCAL (Chạy trực tiếp trên máy)  ██████████
+# ==================================================================
+
+# — 1. Bảo mật & Token —
+fc_secret = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
+                          border_width=1, border_color="#DA373C")
+fc_secret.pack(fill="x", padx=5, pady=(8, 4))
+_sh = ctk.CTkFrame(fc_secret, fg_color="transparent")
+_sh.pack(fill="x", padx=14, pady=(8, 0))
+ctk.CTkLabel(_sh, text="🔐  BẢO MẬT & XÁC THỰC",
+             font=("Segoe UI", 13, "bold"), text_color="#DA373C").pack(side="left")
+ctk.CTkLabel(_sh, text="⚠️  Không chia sẻ cho bất kỳ ai!",
+             font=("Segoe UI", 10), text_color="#FEE75C").pack(side="left", padx=(10, 0))
+entry_token      = make_secret_field(fc_secret, "🤖  DISCORD BOT TOKEN:", "token")
+entry_gemini_key = make_secret_field(fc_secret, "🧠  GEMINI AI API KEY:", "gemini_api_key")
+entry_api_port   = mki(fc_secret, "🔌  LOCAL API PORT (Webserver):", "api_port", "8080")
+ctk.CTkFrame(fc_secret, fg_color="transparent", height=4).pack()
+
+# — 2. Lệnh tùy biến (Prefix) —
+fc_prefix = ctk.CTkFrame(sf_local, fg_color="#1F2010", corner_radius=10,
+                          border_width=1, border_color="#FEE75C")
+fc_prefix.pack(fill="x", padx=5, pady=4)
+_ph = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+_ph.pack(fill="x", padx=14, pady=(8, 0))
+ctk.CTkLabel(_ph, text="✏️  LỆNH TÙY BIẾN",
+             font=("Segoe UI", 13, "bold"), text_color="#FEE75C").pack(side="left")
+ctk.CTkLabel(_ph, text="Tiền tố đứng trước tất cả lệnh Bot",
+             font=("Segoe UI", 10), text_color="#72767D").pack(side="left", padx=(10, 0))
+ctk.CTkLabel(fc_prefix,
+             text="Có thể là 1 ký tự hoặc nhiều ký tự (ví dụ: !  /  m.  ./  bot.)",
+             font=("Segoe UI", 10), text_color="#B5BAC1").pack(anchor="w", padx=14, pady=(3, 0))
+_pr = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+_pr.pack(fill="x", padx=14, pady=(6, 4))
+ctk.CTkLabel(_pr, text="TIỀN TỐ:", font=("Segoe UI", 11, "bold")).pack(side="left")
+entry_prefix = ctk.CTkEntry(_pr, width=96, height=34, font=("Segoe UI", 18, "bold"), placeholder_text="!")
+entry_prefix.insert(0, str(cfg.get("prefix", "!")))
+entry_prefix.pack(side="left", padx=(8, 14))
+_pfx_ex = ctk.StringVar(value=f"{cfg.get('prefix','!')}play  ·  {cfg.get('prefix','!')}skip  ·  {cfg.get('prefix','!')}ban")
+ctk.CTkLabel(_pr, textvariable=_pfx_ex, font=("Segoe UI", 11, "bold"), text_color="#57F287").pack(side="left")
+def _upd_pfx(*_):
+    v = entry_prefix.get() or "!"
+    _pfx_ex.set(f"{v}play  ·  {v}skip  ·  {v}ban")
+entry_prefix.bind("<KeyRelease>", _upd_pfx)
+_prow = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+_prow.pack(fill="x", padx=14, pady=(0, 10))
+ctk.CTkLabel(_prow, text="Chọn nhanh:", font=("Segoe UI", 10), text_color="#72767D").pack(side="left")
+for _pv in ["!", "/", ".", ">", "$", "m.", "./"]:
+    def _mp(v):
+        def _s(): entry_prefix.delete(0, "end"); entry_prefix.insert(0, v); _upd_pfx()
+        return _s
+    ctk.CTkButton(_prow, text=_pv, width=44, height=26,
+                   fg_color="#3A3D42", hover_color="#5865F2",
+                   font=("Segoe UI", 12, "bold"), command=_mp(_pv)).pack(side="left", padx=2)
+fc_local_ctrl = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
+                               border_width=1, border_color="#23A559")
+fc_local_ctrl.pack(fill="x", padx=5, pady=(4, 10))
+ctk.CTkLabel(fc_local_ctrl, text="💻  TRẠNG THÁI & ĐIỀU KHIỂN LOCAL",
+             font=("Segoe UI", 13, "bold"), text_color="#23A559").pack(anchor="w", padx=14, pady=(8, 0))
+lbl_status = ctk.CTkLabel(fc_local_ctrl,
+                           text="TRẠNG THÁI: ĐANG KIỂM TRA...",
+                           text_color="#FEE75C", font=("Segoe UI", 14, "bold"))
+lbl_status.pack(pady=(4, 2))
+_ctrl_row = ctk.CTkFrame(fc_local_ctrl, fg_color="transparent")
+_ctrl_row.pack(pady=(4, 6))
+ctk.CTkButton(_ctrl_row, text="▶ CHẠY BOT", height=38, width=130,
+               font=("Segoe UI", 13, "bold"), fg_color="#23A559", hover_color="#1A7A41",
+               command=start_bot).pack(side="left", padx=5)
+ctk.CTkButton(_ctrl_row, text="⏹ NGỪNG", height=38, width=110,
+               font=("Segoe UI", 13, "bold"), fg_color="#DA373C", hover_color="#A12828",
+               command=stop_bot).pack(side="left", padx=5)
+ctk.CTkButton(fc_local_ctrl,
+               text="💾 LƯU CẤU HÌNH & TÁI KHỞI ĐỘNG",
+               height=36, width=320,
+               font=("Segoe UI", 13, "bold"), fg_color="#5865F2", hover_color="#4752C4",
+               command=save_and_reset).pack(pady=(2, 12))
+
+
+# ==================================================================
+# ████  NGĂN 2: CẤU HÌNH CLOUD (Deploy / Điều khiển từ xa)  █████████
+# ==================================================================
+
+# — Điều khiển & Đồng bộ từ xa (Remote API / Server) —
+fr = ctk.CTkFrame(sf_cloud, fg_color="#1C1E20", corner_radius=10,
+                   border_width=1, border_color="#F1C40F")
+fr.pack(fill="x", padx=5, pady=(8, 4))
+_frh = ctk.CTkFrame(fr, fg_color="transparent")
+_frh.pack(fill="x", padx=14, pady=(8, 0))
+ctk.CTkLabel(_frh, text="🛰️  ĐỒNG BỘ & ĐIỀU KHIỂN CLOUD SERVER",
+             font=("Segoe UI", 13, "bold"), text_color="#F1C40F").pack(side="left")
+ctk.CTkLabel(_frh, text="DisCloud / VPS / Render",
+             font=("Segoe UI", 10), text_color="#72767D").pack(side="left", padx=(10, 0))
+ctk.CTkLabel(fr,
+             text="Nhập địa chỉ API của Bot Cloud để đẩy dữ liệu cấu hình và kiểm tra kết nối.\n"
+                  "Database Neon PostgreSQL tự động được kết nối qua chuỗi kết nối trong hệ thống.",
+             font=("Segoe UI", 10), text_color="#B5BAC1").pack(anchor="w", padx=14, pady=(3, 0))
+ctk.CTkLabel(fr, text="API URL (Server Cloud):", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=14, pady=(6, 0))
 active_prof_name = gui_settings.get("active_profile", "Default")
 active_prof = gui_settings.get("profiles", {}).get(active_prof_name, {})
-entry_remote_url = ctk.CTkEntry(fr, width=420, height=32, placeholder_text="http://xxx.xxx.xxx.xxx:8080")
+entry_remote_url = ctk.CTkEntry(fr, width=420, height=32,
+                                 placeholder_text="http://12.34.56.78:8080  hoặc  https://my-bot.onrender.com")
 entry_remote_url.insert(0, active_prof.get("remote_api_url", ""))
-entry_remote_url.pack(pady=(2,8), padx=20)
+entry_remote_url.pack(anchor="w", padx=14, pady=(2, 6))
 
-ctk.CTkLabel(fr, text="API Secret Key:", font=("Segoe UI", 11), text_color="#B5BAC1").pack(anchor="w", padx=20)
-entry_remote_key = ctk.CTkEntry(fr, width=420, height=32, show="*", placeholder_text="BOT_SECRET_KEY_2026")
-entry_remote_key.insert(0, active_prof.get("api_secret", "BOT_SECRET_KEY_2026"))
-entry_remote_key.pack(pady=(2,8), padx=20)
+entry_remote_key = make_secret_field(fr, "🔑  API SECRET KEY:", "",
+                                      active_prof.get("api_secret", "BOT_SECRET_KEY_2026"))
 
-lbl_remote_status = ctk.CTkLabel(fr, text="⬤ Chưa kết nối", font=("Segoe UI", 12, "bold"), text_color="#72767D")
-lbl_remote_status.pack(pady=4)
-
-
+lbl_remote_status = ctk.CTkLabel(fr, text="◉ Chưa kết nối",
+                                  font=("Segoe UI", 12, "bold"), text_color="#72767D")
+lbl_remote_status.pack(pady=(4, 2))
 
 def ping_remote():
     def task():
@@ -660,36 +778,37 @@ def ping_remote():
     threading.Thread(target=task, daemon=True).start()
 
 def push_config_remote():
-    if not save_settings():
-        return
+    if not save_settings(): return
     active = gui_settings["active_profile"]
     prof = gui_settings["profiles"][active]
     prof["remote_api_url"] = entry_remote_url.get().strip()
     prof["api_secret"] = entry_remote_key.get().strip()
     with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(gui_settings, f, indent=4, ensure_ascii=False)
-    
-    global cfg
-    cfg = load_current_config()
-    
+    global cfg; cfg = load_current_config()
     url = prof.get("remote_api_url", "").strip()
     if url and "http" in url:
-        resp = _remote_request("UPDATE_CONFIG", cfg)
+        resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
         if resp and resp.get("ok"):
-            messagebox.showinfo("Thành công", "Đã lưu và đẩy cấu hình (bao gồm Gemini API Key) lên Bot Cloud thành công!")
+            messagebox.showinfo("Thành công", "Đã lưu và đẩy toàn bộ dữ liệu Bot lên Server Cloud thành công!")
             ping_remote()
         else:
-            err = resp.get("error", "Không thể kết nối đến API Server") if resp else "Lỗi mạng hoặc sai API Key"
-            messagebox.showwarning("Cảnh báo Remote", f"Đã lưu cục bộ nhưng không thể đẩy lên Cloud API:\n{err}")
+            err = resp.get("error", "Không thể kết nối") if resp else "Lỗi mạng hoặc sai API Key"
+            messagebox.showwarning("Cảnh báo Cloud", f"Đã lưu cục bộ nhưng không thể đẩy lên Cloud Server:\n{err}")
     else:
-        messagebox.showinfo("Thành công", "Đã lưu cấu hình cục bộ thành công!")
-
+        messagebox.showinfo("Đã lưu", "Đã lưu cấu hình cục bộ thành công! (Nhập API URL để đẩy lên Cloud Server)")
     update_server_comboboxes()
 
-btn_row = ctk.CTkFrame(fr, fg_color="transparent")
-btn_row.pack(pady=(4,14), padx=20, fill="x")
-ctk.CTkButton(btn_row, text="📡 Ping Bot", width=130, fg_color="#2C2F33", hover_color="#3A3D42", command=ping_remote).pack(side="left", padx=4)
-ctk.CTkButton(btn_row, text="⬆️ Đẩy Config & Reload", width=200, fg_color="#F1A000", hover_color="#D4900A", text_color="black", command=push_config_remote).pack(side="left", padx=4)
+_cloud_btns = ctk.CTkFrame(fr, fg_color="transparent")
+_cloud_btns.pack(pady=(4, 14), padx=14, fill="x")
+ctk.CTkButton(_cloud_btns, text="📡 Ping Bot Cloud", width=140, height=36,
+               fg_color="#2C2F33", hover_color="#3A3D42",
+               font=("Segoe UI", 12, "bold"), command=ping_remote).pack(side="left", padx=4)
+ctk.CTkButton(_cloud_btns, text="⬆️  ĐẨY TẤT CẢ DỮ LIỆU LÊN CLOUD", width=220, height=36,
+               fg_color="#F1A000", hover_color="#D4900A", text_color="black",
+               font=("Segoe UI", 12, "bold"), command=push_config_remote).pack(side="left", padx=4)
+
+ctk.CTkFrame(sf_cloud, fg_color="transparent", height=14).pack()
 
 fcmd_music = ctk.CTkFrame(sf_cmds, fg_color="#2B2D31", corner_radius=12)
 fcmd_music.pack(pady=10, fill="x", padx=10)
@@ -1069,11 +1188,8 @@ def on_server_select(choice):
 
 combo_servers.configure(command=on_server_select)
 
-lbl_status = ctk.CTkLabel(root, text="TRẠNG THÁI: ĐANG KIỂM TRA...", text_color="#FEE75C", font=("Segoe UI", 16, "bold")); lbl_status.pack()
-bfr = ctk.CTkFrame(root, fg_color="transparent"); bfr.pack(pady=5)
-ctk.CTkButton(bfr, text="▶ CHẠY BOT", height=40, font=("Segoe UI", 14, "bold"), fg_color="#23A559", command=start_bot).pack(side="left", padx=5)
-ctk.CTkButton(bfr, text="⏹ NGỪNG", height=40, font=("Segoe UI", 14, "bold"), fg_color="#DA373C", command=stop_bot).pack(side="left", padx=5)
-ctk.CTkButton(root, text="💾 LƯU CẤU HÌNH SERVER VÀ TÁI KHỞI ĐỘNG", height=40, font=("Segoe UI", 14, "bold"), fg_color="#5865F2", command=save_and_reset).pack(pady=(5,30))
+# Status + buttons now embedded inside LOCAL section (fc_local_ctrl above)
+# Keep a no-op reference so update_status_label() still works via globals()
 
 def on_closing():
     for active in list(gui_settings["profiles"].keys()):
