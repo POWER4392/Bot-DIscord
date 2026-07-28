@@ -52,7 +52,19 @@ autoplay_disabled = set()
 server_data = {}
 
 API_SECRET = config.get("api_secret", "changeme123")
-YDL_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': 'False', 'quiet': True, 'no_warnings': True, 'default_search': 'ytsearch', 'extractor_args': {'youtube': ['player_client=android_vr']}}
+YDL_OPTIONS = {
+    'format': 'bestaudio/best',
+    'noplaylist': 'True',
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'ytsearch',
+    'extractor_args': {
+        'youtube': [
+            'player_client=ios,android,mweb',
+            'player_skip=configs,webpage'
+        ]
+    }
+}
 if os.path.exists("cookies.txt"):
     YDL_OPTIONS['cookiefile'] = "cookies.txt"
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}

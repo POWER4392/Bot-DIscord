@@ -196,8 +196,23 @@ class Music(commands.Cog):
                 # Nếu là từ khóa tìm kiếm: Tìm kiếm top 1 kết quả trên YouTube
                 query = f"ytsearch1:{raw_search}"
                 
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                return ydl.extract_info(query, download=False)
+            try:
+                with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                    return ydl.extract_info(query, download=False)
+            except Exception as primary_e:
+                err_str = str(primary_e).lower()
+                if any(k in err_str for k in ["sign in", "bot", "confirm", "auth"]):
+                    print(f"[YouTube Anti-Bot Fallback] Bị YouTube chặn IP bot, tự động chuyển fallback: {raw_search}")
+                    fb_opts = dict(YDL_OPTIONS)
+                    fb_opts['extractor_args'] = {'youtube': ['player_client=ios,mweb']}
+                    fb_query = raw_search if raw_search.startswith("http") else f"scsearch1:{raw_search}"
+                    try:
+                        with yt_dlp.YoutubeDL(fb_opts) as ydl_fb:
+                            return ydl_fb.extract_info(fb_query, download=False)
+                    except Exception:
+                        raise primary_e
+                else:
+                    raise primary_e
                 
         try:
             results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
