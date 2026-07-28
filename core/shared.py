@@ -72,26 +72,26 @@ import shutil
 def get_ffmpeg_executable():
     path = str(config.get("ffmpeg_path", "")).strip()
     
-    if os.name == 'nt':
-        if path and not path.startswith("/") and os.path.exists(path):
-            return path
-        if os.path.exists("./ffmpeg.exe"):
-            return "./ffmpeg.exe"
-        if os.path.exists("ffmpeg.exe"):
-            return "ffmpeg.exe"
-        system_ffmpeg = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
-        if system_ffmpeg:
-            return system_ffmpeg
-        return "./ffmpeg.exe"
-    else:
-        if path and os.path.exists(path):
-            return path
-        system_ffmpeg = shutil.which("ffmpeg")
-        if system_ffmpeg:
-            return system_ffmpeg
-        if os.path.exists("/usr/bin/ffmpeg"):
-            return "/usr/bin/ffmpeg"
-        return "ffmpeg"
+    if path and os.path.exists(path) and (os.name != 'nt' or not path.startswith("/")):
+        return path
+        
+    for p in ["./ffmpeg.exe", "ffmpeg.exe", "./ffmpeg", "ffmpeg"]:
+        if os.path.exists(p):
+            return p
+            
+    system_ffmpeg = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+    if system_ffmpeg:
+        return system_ffmpeg
+        
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and os.path.exists(exe):
+            return exe
+    except Exception:
+        pass
+        
+    return "./ffmpeg.exe" if os.name == 'nt' else "/usr/bin/ffmpeg"
 
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
 PLATFORM_EMOJI = {"youtube": "▶️", "reddit": "🟧", "tiktok": "🎵", "facebook": "🔵"}
