@@ -1,6 +1,6 @@
 @echo off
 title Chay Bot Discord
-cd /d "%~dp0"
+cd /d "%~dp0.."
 if not exist .venv (
     echo [ERROR] Thu muc .venv khong ton tai!
     echo Vui long tao virtual environment va cai dat cac dependencies truoc.

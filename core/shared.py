@@ -62,7 +62,7 @@ YDL_OPTIONS = {
     'js_runtimes': {'node': {}, 'deno': {}},
     'extractor_args': {
         'youtube': [
-            'player_client=web_creator,mweb,android,ios'
+            'player_client=mweb,ios,android,tv_embedded'
         ]
     }
 }

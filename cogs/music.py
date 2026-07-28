@@ -101,6 +101,37 @@ def make_music_embed(info, title="Đang Phát"):
     embed.add_field(name="👤 Kênh", value=info.get('uploader', 'Không xác định'))
     return embed
 
+def extract_info_with_fallback(query: str):
+    try:
+        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+            return ydl.extract_info(query, download=False)
+    except Exception as primary_e:
+        print(f"[YouTube Primary Failed] {primary_e}. Đang chuyển sang Backup 1 (No-Cookie Client)...")
+        no_cookie_opts = dict(YDL_OPTIONS)
+        no_cookie_opts.pop('cookiefile', None)
+        no_cookie_opts['extractor_args'] = {'youtube': ['player_client=mweb,ios,android,tv_embedded']}
+        try:
+            with yt_dlp.YoutubeDL(no_cookie_opts) as ydl_nc:
+                return ydl_nc.extract_info(query, download=False)
+        except Exception as nc_e:
+            print(f"[YouTube Backup 1 Failed] {nc_e}. Đang chuyển sang Backup 2 (Audio Stream Engine)...")
+            song_title = query
+            if query.startswith("http") and ("youtube.com" in query or "youtu.be" in query):
+                try:
+                    r = requests.get(f"https://www.youtube.com/oembed?url={query}&format=json", timeout=5)
+                    if r.status_code == 200:
+                        t = r.json().get('title')
+                        if t: song_title = t
+                except Exception: pass
+                
+            sc_query = f"scsearch1:{song_title}" if not (song_title.startswith("http") and "soundcloud.com" in song_title) else song_title
+            try:
+                sc_opts = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'no_warnings': True}
+                with yt_dlp.YoutubeDL(sc_opts) as ydl_sc:
+                    return ydl_sc.extract_info(sc_query, download=False)
+            except Exception:
+                raise primary_e
+
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -128,8 +159,7 @@ class Music(commands.Cog):
                     status_msg = await ctx.channel.send("🔍 Đang rà đài phát bài ngẫu nhiên cùng phân khúc...")
                     def fetch_related():
                         q = f"ytsearch10:{last_song.get('uploader', '')} {last_song.get('title', '').split()[0]} tracks"
-                        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                            return ydl.extract_info(q, download=False)
+                        return extract_info_with_fallback(q)
                     try:
                         results = await self.bot.loop.run_in_executor(None, fetch_related)
                         if 'entries' in results and len(results['entries']) > 0:
@@ -197,35 +227,7 @@ class Music(commands.Cog):
                 # Nếu là từ khóa tìm kiếm: Tìm kiếm top 1 kết quả trên YouTube
                 query = f"ytsearch1:{raw_search}"
                 
-            try:
-                with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                    return ydl.extract_info(query, download=False)
-            except Exception as primary_e:
-                print(f"[YouTube Primary Failed] {primary_e}. Đang chuyển sang Backup 1 (No-Cookie Client)...")
-                no_cookie_opts = dict(YDL_OPTIONS)
-                no_cookie_opts.pop('cookiefile', None)
-                no_cookie_opts['extractor_args'] = {'youtube': ['player_client=tv_embedded,ios,mweb']}
-                try:
-                    with yt_dlp.YoutubeDL(no_cookie_opts) as ydl_nc:
-                        return ydl_nc.extract_info(query, download=False)
-                except Exception as nc_e:
-                    print(f"[YouTube Backup 1 Failed] {nc_e}. Đang chuyển sang Backup 2 (Audio Stream Engine)...")
-                    song_title = raw_search
-                    if raw_search.startswith("http") and ("youtube.com" in raw_search or "youtu.be" in raw_search):
-                        try:
-                            r = requests.get(f"https://www.youtube.com/oembed?url={raw_search}&format=json", timeout=5)
-                            if r.status_code == 200:
-                                t = r.json().get('title')
-                                if t: song_title = t
-                        except Exception: pass
-                        
-                    sc_query = f"scsearch1:{song_title}" if not (song_title.startswith("http") and "soundcloud.com" in song_title) else song_title
-                    try:
-                        sc_opts = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'no_warnings': True}
-                        with yt_dlp.YoutubeDL(sc_opts) as ydl_sc:
-                            return ydl_sc.extract_info(sc_query, download=False)
-                    except Exception:
-                        raise primary_e
+            return extract_info_with_fallback(query)
                 
         try:
             results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
