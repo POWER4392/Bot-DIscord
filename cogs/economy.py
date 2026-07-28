@@ -7,7 +7,7 @@ import random
 import os
 import time
 from core.shared import config, level_cooldown
-from core.database import cursor, db_lock, db_get_user, db_update_xp
+from core.database import cursor, db_lock, db_get_user, db_update_xp, xp_for_level, level_for_xp
 
 class Economy(commands.Cog):
     def __init__(self, bot):
@@ -26,10 +26,25 @@ class Economy(commands.Cog):
             level_cooldown[user_id] = current_time
             await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
             earned_xp = random.randint(15, 25)
-            old_level, new_level = await self.bot.loop.run_in_executor(None, db_update_xp, guild_id, user_id, earned_xp)
+            old_level, new_level, total_xp = await self.bot.loop.run_in_executor(None, db_update_xp, guild_id, user_id, earned_xp)
             
             if new_level > old_level:
-                await message.channel.send(f"🎉 Chúc mừng {message.author.mention}! Cày cuốc chăm chỉ đã giúp bạn đột phá lên **Cấp {new_level}**! 🚀 (+{earned_xp} XP)")
+                next_lvl_xp = xp_for_level(new_level + 1)
+                embed = discord.Embed(
+                    title="🎉 ĐỘT PHÁ CẤP ĐỘ! (LEVEL UP)",
+                    description=f"Chúc mừng {message.author.mention} đã cày cuốc chăm chỉ và thăng cấp thành công!",
+                    color=0xF1C40F
+                )
+                embed.set_thumbnail(url=message.author.display_avatar.url)
+                embed.add_field(name="⭐ Cấp độ", value=f"**Cấp {old_level}** ➔ **Cấp {new_level}**", inline=True)
+                embed.add_field(name="⚡ Tổng XP", value=f"**{total_xp:,}** XP *(+{earned_xp} XP)*", inline=True)
+                embed.add_field(name="🎯 Cấp tiếp theo", value=f"**{next_lvl_xp:,}** XP", inline=False)
+                
+                footer_icon = message.guild.icon.url if (message.guild and message.guild.icon) else None
+                guild_name = message.guild.name if message.guild else "Server"
+                embed.set_footer(text=f"Server: {guild_name} • Tiếp tục tương tác để nhận thêm XP!", icon_url=footer_icon)
+                
+                await message.channel.send(embed=embed)
 
     @commands.hybrid_command(name="top", description="Bảng xếp hạng XP Top 10 của Server.")
     async def leaderboard(self, ctx):
@@ -63,7 +78,8 @@ class Economy(commands.Cog):
         current_data = await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
         xp, level = current_data[0], current_data[1]
         
-        next_level_xp = int(100 * (level ** 1.5)) + 100
+        current_lvl_xp = xp_for_level(level)
+        next_lvl_xp = xp_for_level(level + 1)
         
         sorted_users = []
         def fetch_sorted_users():
@@ -101,13 +117,14 @@ class Economy(commands.Cog):
             bar_x, bar_y, bar_w, bar_h = 250, 170, 500, 30
             draw.rounded_rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h), radius=15, fill=(64, 68, 75))
             
-            current_lvl_xp = int(100 * ((level-1) ** 1.5)) if level > 1 else 0
             xp_in_level = max(0, xp - current_lvl_xp)
-            xp_needed = max(1, next_level_xp - current_lvl_xp)
+            xp_needed = max(1, next_lvl_xp - current_lvl_xp)
             progress = min(1.0, xp_in_level / xp_needed)
-            fill_w = max(30, int(bar_w * progress))
-            draw.rounded_rectangle((bar_x, bar_y, bar_x + fill_w, bar_y + bar_h), radius=15, fill=(88, 101, 242))
-            draw.text((bar_x + bar_w - 200, bar_y - 35), f"{xp} / {next_level_xp} XP", font=font_s, fill=(255, 255, 255))
+            fill_w = max(30, int(bar_w * progress)) if progress > 0 else 0
+            if fill_w > 0:
+                draw.rounded_rectangle((bar_x, bar_y, bar_x + fill_w, bar_y + bar_h), radius=15, fill=(88, 101, 242))
+            
+            draw.text((bar_x + bar_w - 200, bar_y - 35), f"{xp:,} / {next_lvl_xp:,} XP", font=font_s, fill=(255, 255, 255))
 
             with BytesIO() as image_binary:
                 bg.save(image_binary, "PNG")
@@ -121,20 +138,21 @@ class Economy(commands.Cog):
         data = await self.bot.loop.run_in_executor(None, db_get_user, guild_id, user_id)
         xp, level = data[0], data[1]
         
-        next_level_xp = int(100 * (level ** 1.5)) + 100
-        current_lvl_xp = int(100 * ((level - 1) ** 1.5)) if level > 1 else 0
+        current_lvl_xp = xp_for_level(level)
+        next_lvl_xp = xp_for_level(level + 1)
         xp_in_level = max(0, xp - current_lvl_xp)
-        xp_needed = max(1, next_level_xp - current_lvl_xp)
+        xp_needed = max(1, next_lvl_xp - current_lvl_xp)
         progress_pct = min(100, int(xp_in_level / xp_needed * 100))
         bar_filled = int(progress_pct / 10)
-        bar = "\u2588" * bar_filled + "\u2591" * (10 - bar_filled)
+        bar = "█" * bar_filled + "░" * (10 - bar_filled)
         
-        embed = discord.Embed(title=f"\ud83c\udfc6 H\u1ed3 S\u01a1 c\u1ee7a {member.display_name}", color=0x5865F2)
+        embed = discord.Embed(title=f"🏆 Hồ Sơ của {member.display_name}", color=0x5865F2)
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="\ud83c\udf1f Level", value=f"**{level}**", inline=True)
-        embed.add_field(name="\u26a1 XP", value=f"**{xp:,}** XP", inline=True)
-        embed.add_field(name="\ud83d\udcca Ti\u1ebfn \u0111\u1ed9", value=f"`{bar}` {progress_pct}%\n({xp_in_level}/{xp_needed} XP \u0111\u1ebfn c\u1ea5p {level+1})", inline=False)
+        embed.add_field(name="🌟 Level", value=f"**{level}**", inline=True)
+        embed.add_field(name="⚡ XP", value=f"**{xp:,}** XP", inline=True)
+        embed.add_field(name="📊 Tiến độ", value=f"`{bar}` {progress_pct}%\n({xp:,}/{next_lvl_xp:,} XP đến cấp {level+1})", inline=False)
         await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))
+

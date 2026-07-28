@@ -175,6 +175,18 @@ except Exception:
     pass
 conn.commit()
 
+def xp_for_level(level: int) -> int:
+    """Trả về tổng XP cần thiết để ĐẠT ĐƯỢC level này."""
+    if level <= 1:
+        return 0
+    return int(100 * ((level - 1) ** 1.5))
+
+def level_for_xp(xp: int) -> int:
+    """Trả về level tương ứng với tổng XP."""
+    if xp <= 0:
+        return 1
+    return max(1, int((xp / 100) ** (1 / 1.5)) + 1)
+
 def db_get_user(guild_id, user_id):
     with db_lock:
         cursor.execute("SELECT xp, level FROM users WHERE guild_id=? AND user_id=?", (guild_id, user_id))
@@ -183,7 +195,13 @@ def db_get_user(guild_id, user_id):
             cursor.execute("INSERT INTO users (guild_id, user_id, xp, level) VALUES (?, ?, 0, 1)", (guild_id, user_id))
             conn.commit()
             return (0, 1)
-        return row
+        xp, level = row[0], row[1]
+        correct_level = level_for_xp(xp)
+        if correct_level != level:
+            cursor.execute("UPDATE users SET level=? WHERE guild_id=? AND user_id=?", (correct_level, guild_id, user_id))
+            conn.commit()
+            return (xp, correct_level)
+        return (xp, level)
 
 def db_update_xp(guild_id, user_id, xp_add):
     with db_lock:
@@ -191,9 +209,10 @@ def db_update_xp(guild_id, user_id, xp_add):
         row = cursor.fetchone()
         if row:
             nxp, clvl = row[0] + xp_add, row[1]
-            nlvl = max(1, int((nxp / 100) ** (1/1.5)))
+            nlvl = level_for_xp(nxp)
             if nlvl < clvl: nlvl = clvl
             cursor.execute("UPDATE users SET xp=?, level=? WHERE guild_id=? AND user_id=?", (nxp, nlvl, guild_id, user_id))
             conn.commit()
-            return clvl, nlvl
-        return 1, 1
+            return clvl, nlvl, nxp
+        return 1, 1, xp_add
+
