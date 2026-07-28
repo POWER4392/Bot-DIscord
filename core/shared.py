@@ -59,12 +59,15 @@ YDL_OPTIONS = {
     'no_warnings': True,
     'default_search': 'ytsearch',
     'nocheckcertificate': True,
+    'js_runtimes': {'node': {}, 'deno': {}},
     'extractor_args': {
         'youtube': [
-            'player_client=tv_embedded,ios'
+            'player_client=web_creator,mweb,android,ios'
         ]
     }
 }
+if os.path.exists("cookies.txt"):
+    YDL_OPTIONS['cookiefile'] = "cookies.txt"
 import shutil
 
 def get_ffmpeg_executable():
