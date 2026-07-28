@@ -9,7 +9,7 @@ Tài liệu này sẽ cung cấp cho bạn thông tin chi tiết về các tính
 ## 🌟 TÍNH NĂNG NỔI BẬT
 
 - **🎶 Âm Nhạc Chất Lượng Cao:** Phát nhạc trực tiếp từ YouTube, hỗ trợ hàng đợi, bỏ qua và điều khiển phát lại mượt mà.
-- **💰 Hệ Thống Kinh Tế & Cấp Độ:** Tích hợp hệ thống điểm danh nhận thưởng, cửa hàng, tài xỉu, và thẻ cấp độ (Rank Card) được thiết kế đẹp mắt.
+- **💰 Hệ Thống Cấp Độ:** Tích hợp hệ thống thẻ cấp độ (Rank Card) được thiết kế đẹp mắt.
 - **🛡️ Quản Lý Cấp Cao:** Cung cấp đầy đủ công cụ Moderation (Kick, Ban, Mute, Xóa tin nhắn, Lọc từ ngữ) giúp Admin quản lý máy chủ hiệu quả.
 - **📡 Theo Dõi Mạng Xã Hội:** Tự động thông báo khi có bài viết hoặc video mới từ YouTube, TikTok, Reddit, Facebook.
 - **🎟️ Hỗ Trợ Nhanh Chóng:** Tích hợp hệ thống Ticket giúp người dùng dễ dàng liên hệ với đội ngũ quản trị.
@@ -30,12 +30,9 @@ Nhóm lệnh này hỗ trợ mọi thành viên trong việc điều khiển âm
 - `!stop`: Dừng phát nhạc hoàn toàn, xóa hàng đợi và yêu cầu Bot rời khỏi kênh thoại.
 - `!ping`: Kiểm tra độ trễ (latency) của Bot tới máy chủ Discord (tính bằng ms).
 
-### 💳 2. Lệnh Hệ Thống Kinh Tế & Cấp Độ
-Nhóm lệnh này giúp người dùng tham gia vào nền kinh tế của máy chủ và kiểm tra cấp bậc.
+### 💳 2. Lệnh Hệ Thống Cấp Độ
+Nhóm lệnh này giúp người dùng kiểm tra cấp bậc.
 
-- `!daily`: Điểm danh nhận phần thưởng hàng ngày (Mặc định: 200 Vàng). Có thể sử dụng mỗi 24 giờ.
-- `!bank`: Kiểm tra thông tin ví tiền, số dư hiện tại và cấp độ của bạn.
-  - *Lưu ý: Lệnh này bao gồm một Mini-Shop và hệ thống minigame (Tài Xỉu) để bạn có thể kiếm thêm hoặc mua các danh hiệu (Role) đặc biệt.*
 - `!rank` hoặc `!rank @Người_Dùng`: Hiển thị Thẻ Cấp Độ (Rank Card) cá nhân hoặc của người khác với giao diện được thiết kế độc quyền.
 
 ### 🎙️ 3. Lệnh Tiện Ích Cá Nhân
