@@ -53,7 +53,7 @@ server_data = {}
 
 API_SECRET = config.get("api_secret", "changeme123")
 YDL_OPTIONS = {
-    'format': 'bestaudio/best',
+    'format': 'bestaudio/best/m4a/mp4/webm/140/251/18/any',
     'noplaylist': 'True',
     'quiet': True,
     'no_warnings': True,
@@ -61,7 +61,7 @@ YDL_OPTIONS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': [
-            'player_client=ios'
+            'player_client=ios,mweb,web'
         ]
     }
 }
