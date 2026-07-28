@@ -65,8 +65,10 @@ YDL_OPTIONS = {
         ]
     }
 }
-if os.path.exists("cookies.txt"):
-    YDL_OPTIONS['cookiefile'] = "cookies.txt"
+for c_path in ["config/.yt_cookies.data", "config/yt_session.dat", ".cookies.dat", "cookies.txt", "www.youtube.com_cookies.txt"]:
+    if os.path.exists(c_path):
+        YDL_OPTIONS['cookiefile'] = c_path
+        break
 import shutil
 
 def get_ffmpeg_executable():

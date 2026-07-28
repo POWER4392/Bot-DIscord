@@ -14,10 +14,13 @@ bot_discloud.zip
 bot_upload.zip
 roles_list.json
 
-# Bảo mật — chứa token
+# Bảo mật — chứa token & session cookies
 config.json
 databases/
 cookies.txt
+*cookies*
+*.data
+*.dat
 gui_settings.json
 .env
 *.log
