@@ -173,32 +173,31 @@ class Music(commands.Cog):
         await status_msg.edit(content="📡 Đang tìm kiếm bài hát...")
         def fetch_youtube_data():
             nonlocal search
-            if "spoti" in search and search.startswith("http"):
-                try:
-                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                    html = requests.get(search, headers=headers, timeout=5).text
-                    t_match = re.search(r'<title>(.*?)</title>', html)
-                    if t_match:
-                        title_text = t_match.group(1).replace(" - song and lyrics by ", " ")
-                        title_text = re.sub(r' \| Spotify$', '', title_text).replace("&#39;", "'").replace("&amp;", "&")
-                        search = title_text.strip()
-                    else: search = "Spotify unsupported DRM track"
-                except: search = "Spotify fallback error"
+            raw_search = search.strip()
             
-            # YouTube Datacenter WAF Bypass: Bridge YouTube URLs to SoundCloud
-            if search.startswith("http") and ("youtube.com" in search or "youtu.be" in search):
+            # Xử lý Link Spotify: Lấy tên bài + ca sĩ từ Spotify API/oEmbed
+            if "spotify.com" in raw_search and raw_search.startswith("http"):
                 try:
-                    oembed_url = f"https://www.youtube.com/oembed?url={search}&format=json"
-                    r = requests.get(oembed_url, timeout=5)
+                    sp_oembed = f"https://open.spotify.com/oembed?url={raw_search}"
+                    r = requests.get(sp_oembed, timeout=5)
                     if r.status_code == 200:
-                        yt_title = r.json().get('title', '')
-                        if yt_title:
-                            search = yt_title
-                except Exception:
-                    pass  # Fallback to normal URL handling if oEmbed fails
+                        data = r.json()
+                        title = data.get("title", "")
+                        author = data.get("author_name", "")
+                        if title:
+                            raw_search = f"{title} {author}".strip()
+                except Exception as e:
+                    print(f"[Spotify Parse Warning] {e}")
 
-            query = f"ytsearch1:{search}" if not search.startswith("http") else search
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl: return ydl.extract_info(query, download=False)
+            # Nếu là URL trực tiếp (YouTube, SoundCloud, TikTok, audio link...): Giữ nguyên URL cho yt-dlp
+            if raw_search.startswith("http://") or raw_search.startswith("https://"):
+                query = raw_search
+            else:
+                # Nếu là từ khóa tìm kiếm: Tìm kiếm top 1 kết quả trên YouTube
+                query = f"ytsearch1:{raw_search}"
+                
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                return ydl.extract_info(query, download=False)
                 
         try:
             results = await self.bot.loop.run_in_executor(None, fetch_youtube_data)
