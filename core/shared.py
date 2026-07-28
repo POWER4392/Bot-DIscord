@@ -58,7 +58,12 @@ YDL_OPTIONS = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
-    'nocheckcertificate': True
+    'nocheckcertificate': True,
+    'extractor_args': {
+        'youtube': [
+            'player_client=ios'
+        ]
+    }
 }
 if os.path.exists("cookies.txt"):
     YDL_OPTIONS['cookiefile'] = "cookies.txt"
