@@ -201,21 +201,12 @@ class Music(commands.Cog):
                 with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                     return ydl.extract_info(query, download=False)
             except Exception as primary_e:
-                print(f"[YouTube Primary Failed] {primary_e}. Đang kích hoạt Cloud Fallback Engine...")
-                song_title = raw_search
-                if raw_search.startswith("http") and ("youtube.com" in raw_search or "youtu.be" in raw_search):
-                    try:
-                        r = requests.get(f"https://www.youtube.com/oembed?url={raw_search}&format=json", timeout=5)
-                        if r.status_code == 200:
-                            t = r.json().get('title')
-                            if t: song_title = t
-                    except Exception: pass
-                    
-                sc_query = f"scsearch1:{song_title}" if not (song_title.startswith("http") and "soundcloud.com" in song_title) else song_title
+                print(f"[YouTube Primary Failed] {primary_e}. Đang chuyển sang YouTube Backup Client...")
+                backup_opts = dict(YDL_OPTIONS)
+                backup_opts['extractor_args'] = {'youtube': ['player_client=mweb,android,web_creator']}
                 try:
-                    sc_opts = {'format': 'bestaudio/best', 'noplaylist': 'True', 'quiet': True, 'no_warnings': True}
-                    with yt_dlp.YoutubeDL(sc_opts) as ydl_sc:
-                        return ydl_sc.extract_info(sc_query, download=False)
+                    with yt_dlp.YoutubeDL(backup_opts) as ydl_backup:
+                        return ydl_backup.extract_info(query, download=False)
                 except Exception:
                     raise primary_e
                 

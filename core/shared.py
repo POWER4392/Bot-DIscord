@@ -61,7 +61,7 @@ YDL_OPTIONS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': [
-            'player_client=tv_embedded,ios,mweb'
+            'player_client=web_creator,mweb,android,ios'
         ]
     }
 }
