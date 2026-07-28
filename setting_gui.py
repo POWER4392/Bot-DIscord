@@ -201,11 +201,6 @@ def stop_bot():
     profile = gui_settings["profiles"].get(active)
     if not profile: return
     
-    # Check if this profile is remote (runs on cloud)
-    url = profile.get("remote_api_url", "").strip().rstrip("/")
-    if url and "http" in url:
-        return messagebox.showwarning("Cảnh báo", "Bot đang hoạt động ở chế độ Cloud từ xa. Bạn không thể điều khiển tiến trình chạy cục bộ.")
-        
     config_file = profile.get("config_file", "config.json")
     
     # Stop tracked process
@@ -237,11 +232,6 @@ def start_bot():
     profile = gui_settings["profiles"].get(active)
     if not profile: return
     
-    # Check if this profile is remote (runs on cloud)
-    url = profile.get("remote_api_url", "").strip().rstrip("/")
-    if url and "http" in url:
-        return messagebox.showwarning("Cảnh báo", "Bot đang hoạt động ở chế độ Cloud từ xa. Bạn không thể điều khiển tiến trình chạy cục bộ.")
-        
     config_file = profile.get("config_file", "config.json")
     
     stop_bot()
@@ -437,14 +427,15 @@ def save_settings():
 def save_and_reset():
     ok, mode_or_err = save_settings()
     if not ok:
-        messagebox.showerror("Lỗi Đồng Bộ Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Server Cloud:\n\n❌ {mode_or_err}")
+        messagebox.showwarning("Cảnh Báo Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Server Cloud:\n\n❌ {mode_or_err}\n\nBot Local vẫn được khởi động lại với cấu hình mới!")
+        start_bot()
         return
         
     if mode_or_err == "cloud":
-        messagebox.showinfo("Thành Công Cloud", "Đã lưu và đồng bộ thành công toàn bộ dữ liệu cấu hình lên Cloud Server!")
+        messagebox.showinfo("Thành Công Cloud", "Đã lưu và đồng bộ thành công toàn bộ dữ liệu cấu hình (Tiền tố, Lệnh tùy biến) lên Cloud Server!")
     else:
-        messagebox.showinfo("Thành Công Local", "Đã lưu cấu hình cục bộ thành công!")
-        start_bot()
+        messagebox.showinfo("Thành Công Local", "Đã lưu cấu hình cục bộ và khởi động lại Bot thành công!")
+    start_bot()
 
 # --- GIAO DIỆN CHÍNH ---
 ctk.set_appearance_mode("dark")
