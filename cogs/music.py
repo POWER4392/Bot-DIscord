@@ -106,16 +106,21 @@ def extract_info_with_fallback(query: str):
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
             return ydl.extract_info(query, download=False)
     except Exception as primary_e:
-        print(f"[YouTube Primary Failed] {primary_e}. Đang chuyển sang Backup 1 (No-Cookie Client)...")
+        print(f"[YouTube Primary Failed] {primary_e}. Đang chuyển sang Backup 1 (Mobile Client)...")
         no_cookie_opts = dict(YDL_OPTIONS)
         no_cookie_opts.pop('cookiefile', None)
-        no_cookie_opts['extractor_args'] = {'youtube': ['player_client=mweb,ios,android,tv_embedded']}
+        no_cookie_opts['extractor_args'] = {'youtube': {'player_client': ['ios', 'android', 'mweb', 'tv_embedded']}}
         try:
             with yt_dlp.YoutubeDL(no_cookie_opts) as ydl_nc:
                 return ydl_nc.extract_info(query, download=False)
         except Exception as nc_e:
             print(f"[YouTube Backup 1 Failed] {nc_e}. Đang chuyển sang Backup 2 (Audio Stream Engine)...")
             song_title = query
+            if song_title.startswith("ytsearch1:"):
+                song_title = song_title.replace("ytsearch1:", "").strip()
+            elif song_title.startswith("ytsearch10:"):
+                song_title = song_title.replace("ytsearch10:", "").strip()
+
             if query.startswith("http") and ("youtube.com" in query or "youtu.be" in query):
                 try:
                     r = requests.get(f"https://www.youtube.com/oembed?url={query}&format=json", timeout=5)
@@ -158,7 +163,9 @@ class Music(commands.Cog):
                 async def auto_play_task():
                     status_msg = await ctx.channel.send("🔍 Đang rà đài phát bài ngẫu nhiên cùng phân khúc...")
                     def fetch_related():
-                        q = f"ytsearch10:{last_song.get('uploader', '')} {last_song.get('title', '').split()[0]} tracks"
+                        clean_title = last_song.get('title', '').split('(')[0].split('[')[0].strip()
+                        uploader = last_song.get('uploader', '').strip()
+                        q = f"ytsearch10:{clean_title} {uploader}".strip()
                         return extract_info_with_fallback(q)
                     try:
                         results = await self.bot.loop.run_in_executor(None, fetch_related)
