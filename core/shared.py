@@ -59,17 +59,19 @@ YDL_OPTIONS = {
     'no_warnings': True,
     'default_search': 'ytsearch',
     'nocheckcertificate': True,
-    # Dùng web_creator + mweb để bypass YouTube bot detection tốt hơn trên cloud
     'extractor_args': {
         'youtube': {
             'player_client': ['web_creator', 'mweb', 'ios', 'android'],
-            'po_token': [os.environ.get('YT_PO_TOKEN', '')]
         }
     }
 }
-# Xóa po_token rỗng nếu không có env var
-if not os.environ.get('YT_PO_TOKEN'):
-    YDL_OPTIONS['extractor_args']['youtube'].pop('po_token', None)
+# Nếu có proxy (Render env var YT_PROXY) thì dùng để bypass YouTube IP block
+_yt_proxy = os.environ.get('YT_PROXY', '').strip()
+if _yt_proxy:
+    YDL_OPTIONS['proxy'] = _yt_proxy
+    print(f"[Music] 🌐 Dùng proxy: {_yt_proxy[:30]}...")
+else:
+    print("[Music] ℹ️ Không có YT_PROXY — nếu bị lỗi bot detection, thêm env var YT_PROXY vào Render")
 
 # Tìm cookies.txt theo thứ tự ưu tiên (hỗ trợ cả local Windows và Render cloud)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
