@@ -51,7 +51,7 @@ play_history = {}
 autoplay_disabled = set()
 server_data = {}
 
-API_SECRET = config.get("api_secret", "changeme123")
+API_SECRET = os.environ.get("API_SECRET") or config.get("api_secret") or "BOT_SECRET_KEY_2026"
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': 'True',
