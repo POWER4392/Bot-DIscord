@@ -66,8 +66,14 @@ YDL_OPTIONS = {
         ]
     }
 }
-if os.path.exists("cookies.txt"):
-    YDL_OPTIONS['cookiefile'] = "cookies.txt"
+# Dùng đường dẫn tuyệt đối để tìm cookies.txt (hoạt động đúng cả local lẫn Render cloud)
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_COOKIES_PATH = os.path.join(_BASE_DIR, "cookies.txt")
+if os.path.exists(_COOKIES_PATH):
+    YDL_OPTIONS['cookiefile'] = _COOKIES_PATH
+    print(f"[Music] ✅ Đã nạp cookies từ: {_COOKIES_PATH}")
+else:
+    print(f"[Music] ⚠️ Không tìm thấy cookies.txt tại: {_COOKIES_PATH}")
 import shutil
 
 def get_ffmpeg_executable():
