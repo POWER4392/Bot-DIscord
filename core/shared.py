@@ -59,13 +59,18 @@ YDL_OPTIONS = {
     'no_warnings': True,
     'default_search': 'ytsearch',
     'nocheckcertificate': True,
-    'js_runtimes': {'node': {}, 'deno': {}},
+    # Dùng web_creator + mweb để bypass YouTube bot detection tốt hơn trên cloud
     'extractor_args': {
-        'youtube': [
-            'player_client=mweb,ios,android,tv_embedded'
-        ]
+        'youtube': {
+            'player_client': ['web_creator', 'mweb', 'ios', 'android'],
+            'po_token': [os.environ.get('YT_PO_TOKEN', '')]
+        }
     }
 }
+# Xóa po_token rỗng nếu không có env var
+if not os.environ.get('YT_PO_TOKEN'):
+    YDL_OPTIONS['extractor_args']['youtube'].pop('po_token', None)
+
 # Tìm cookies.txt theo thứ tự ưu tiên (hỗ trợ cả local Windows và Render cloud)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COOKIES_CANDIDATES = [

@@ -1,7 +1,8 @@
 discord.py[voice]
 davey
 yt-dlp>=2025.01.26
-jsengine
+bgutil-ytdlp-pot-provider
+yt-dlp-get-pot
 requests
 Pillow
 aiohttp
