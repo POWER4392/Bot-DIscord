@@ -17,8 +17,8 @@ roles_list.json
 # Bảo mật — chứa token & session cookies
 config.json
 databases/
-cookies.txt
-*cookies*
+# cookies.txt — được phép push (repo private, cần cho yt-dlp trên Render)
+# *cookies*  <-- đã bỏ chặn
 *.data
 *.dat
 gui_settings.json
