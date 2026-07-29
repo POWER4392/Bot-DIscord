@@ -81,14 +81,41 @@ def _remote_request(action, extra_payload=None):
         url = f"http://127.0.0.1:{port}"
         key = local_key
 
-    url = url.rstrip("/") + "/api"
-    if not url or "http" not in url: return None
     payload = {"action": action}
     if extra_payload: payload.update(extra_payload)
-    try:
-        resp = http_requests.post(url, json=payload, headers={"X-API-Key": key}, timeout=10)
-        return resp.json()
-    except: return None
+
+    # Nếu là URL từ xa: gửi trực tiếp
+    if url and "127.0.0.1" not in url and "localhost" not in url:
+        target_url = url.rstrip("/") + "/api"
+        try:
+            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": key}, timeout=10)
+            return resp.json()
+        except:
+            return None
+
+    # Nếu là Local mode: Thử cổng đã cấu hình và cổng dự phòng (8080, 8081, 8082)
+    candidate_ports = []
+    if not url:
+        candidate_ports.append("8080")
+    else:
+        try:
+            p = url.split(":")[-1].split("/")[0]
+            if p.isdigit(): candidate_ports.append(p)
+        except: pass
+
+    for p in ["8080", "8081", "8082"]:
+        if p not in candidate_ports:
+            candidate_ports.append(p)
+
+    for p in candidate_ports:
+        target_url = f"http://127.0.0.1:{p}/api"
+        try:
+            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": key}, timeout=5)
+            if resp.status_code in [200, 400, 403]:
+                return resp.json()
+        except:
+            continue
+    return None
 
 
 def load_current_config():
