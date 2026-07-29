@@ -2,7 +2,8 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 import time
 import PIL.Image
@@ -20,10 +21,10 @@ class AIChatbot(commands.Cog):
         from core.shared import config
         raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
         self.api_key = self.sanitize_key(raw_key)
-        self.model_name = "gemini-2.0-flash"
-        self.model = None
+        self.model_name = "gemini-2.5-flash"
+        self.client = None
 
-        # In-memory chat sessions: {(guild_id, user_id): genai.ChatSession}
+        # In-memory chat sessions: {(guild_id, user_id): genai.chats.Chat}
         self.chat_sessions: dict = {}
 
         # Anti-Spam Sliding Window: {user_id: [timestamps]}
@@ -48,7 +49,7 @@ class AIChatbot(commands.Cog):
         return k
 
     def ensure_model_initialized(self) -> bool:
-        if self.model:
+        if self.client:
             return True
         from core.shared import config
         raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
@@ -57,23 +58,17 @@ class AIChatbot(commands.Cog):
             return False
 
         self.api_key = key
-        try:
-            genai.configure(api_key=self.api_key)
-        except Exception as e:
-            print(f"[AI Error] genai.configure: {e}")
-
         models_to_try = [
-            "gemini-2.0-flash",
             "gemini-2.5-flash",
+            "gemini-2.0-flash",
             "gemini-1.5-flash",
             "gemini-2.0-flash-lite",
-            "gemini-flash-latest",
-            "gemini-pro"
+            "gemini-flash-latest"
         ]
         for m_name in models_to_try:
             try:
                 self.model_name = m_name
-                self.model = genai.GenerativeModel(self.model_name)
+                self.client = genai.Client(api_key=self.api_key)
                 print(f"[AI] Gemini API nạp thành công với model {self.model_name}.")
                 return True
             except Exception as ex:
@@ -85,16 +80,16 @@ class AIChatbot(commands.Cog):
     # ------------------------------------------------------------------
     # Helper: lấy hoặc tạo chat session cho (guild_id, user_id)
     # ------------------------------------------------------------------
-    def _get_session(self, guild_id: int, user_id: int, system_prompt: str) -> "genai.ChatSession":
+    def _get_session(self, guild_id: int, user_id: int, system_prompt: str):
         key = (guild_id, user_id)
         if key not in self.chat_sessions:
-            dynamic_model = genai.GenerativeModel(
-                self.model_name,
-                system_instruction=system_prompt
-            )
-            # Nạp lịch sử từ DB
+            config = types.GenerateContentConfig(system_instruction=system_prompt)
             history = self._load_history_from_db(guild_id, user_id)
-            self.chat_sessions[key] = dynamic_model.start_chat(history=history)
+            self.chat_sessions[key] = self.client.chats.create(
+                model=self.model_name,
+                config=config,
+                history=history
+            )
         return self.chat_sessions[key]
 
     # ------------------------------------------------------------------
@@ -304,7 +299,7 @@ class AIChatbot(commands.Cog):
         except Exception as e:
             print(f"[SetKey Error] {e}")
 
-        self.model = None
+        self.client = None
         self.chat_sessions.clear()
         
         if self.ensure_model_initialized():
@@ -312,7 +307,7 @@ class AIChatbot(commands.Cog):
             try:
                 test_res = await self.bot.loop.run_in_executor(
                     None,
-                    lambda: self.model.generate_content("Xin chào")
+                    lambda: self.client.models.generate_content(model=self.model_name, contents="Xin chào")
                 )
                 if test_res and test_res.text:
                     await ctx.send(f"✅ **Thành công!** Gemini API Key đã được xác thực và hoạt động 100% (Model: `{self.model_name}`). Hãy thử chat `!ai Xin chào` ngay bây giờ!")
@@ -450,7 +445,7 @@ class AIChatbot(commands.Cog):
                     
                     response = await self.bot.loop.run_in_executor(
                         None,
-                        lambda: self.model.generate_content([prompt, image_pil])
+                        lambda: self.client.models.generate_content(model=self.model_name, contents=[prompt, image_pil])
                     )
                     reply_text = response.text
                 else:
@@ -470,7 +465,7 @@ class AIChatbot(commands.Cog):
                         self.chat_sessions.pop((guild_id, user_id), None)
                         response = await self.bot.loop.run_in_executor(
                             None,
-                            lambda: self.model.generate_content(f"{system_prompt}\n\n{prompt_with_rag}")
+                            lambda: self.client.models.generate_content(model=self.model_name, contents=f"{system_prompt}\n\n{prompt_with_rag}")
                         )
                         reply_text = response.text
 

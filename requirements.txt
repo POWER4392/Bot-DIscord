@@ -9,7 +9,7 @@ aiohttp
 psycopg2-binary
 PyNaCl
 python-dotenv
-google-generativeai
+google-genai
 customtkinter
 psutil
 
