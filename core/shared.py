@@ -66,14 +66,25 @@ YDL_OPTIONS = {
         ]
     }
 }
-# Dùng đường dẫn tuyệt đối để tìm cookies.txt (hoạt động đúng cả local lẫn Render cloud)
+# Tìm cookies.txt theo thứ tự ưu tiên (hỗ trợ cả local Windows và Render cloud)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_COOKIES_PATH = os.path.join(_BASE_DIR, "cookies.txt")
-if os.path.exists(_COOKIES_PATH):
+_COOKIES_CANDIDATES = [
+    os.environ.get("COOKIES_PATH", ""),          # 1. Biến môi trường COOKIES_PATH (Render env var)
+    os.path.join(_BASE_DIR, "cookies.txt"),       # 2. Thư mục gốc project (tuyệt đối)
+    os.path.join(os.getcwd(), "cookies.txt"),     # 3. Working directory hiện tại
+    "cookies.txt",                                # 4. Tương đối (fallback)
+]
+print(f"[Music] 🔍 Đang tìm cookies.txt... (BASE_DIR={_BASE_DIR}, CWD={os.getcwd()})")
+_COOKIES_PATH = None
+for _c in _COOKIES_CANDIDATES:
+    if _c and os.path.exists(_c):
+        _COOKIES_PATH = _c
+        break
+if _COOKIES_PATH:
     YDL_OPTIONS['cookiefile'] = _COOKIES_PATH
     print(f"[Music] ✅ Đã nạp cookies từ: {_COOKIES_PATH}")
 else:
-    print(f"[Music] ⚠️ Không tìm thấy cookies.txt tại: {_COOKIES_PATH}")
+    print(f"[Music] ⚠️ Không tìm thấy cookies.txt! Đã thử: {[c for c in _COOKIES_CANDIDATES if c]}")
 import shutil
 
 def get_ffmpeg_executable():
