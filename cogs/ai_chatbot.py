@@ -351,7 +351,10 @@ class AIChatbot(commands.Cog):
             )
             return
 
-        await interaction.response.defer()
+        try:
+            await interaction.response.defer()
+        except Exception:
+            pass
         await self._do_chat(
             interaction.channel,
             interaction.user,

@@ -186,9 +186,12 @@ class Music(commands.Cog):
 
     @commands.hybrid_command(name=config.get("cmd_play", "play") or "play", aliases=["p"], description="Phát nhạc từ YouTube, SoundCloud...")
     async def play(self, ctx, *, search: str):
+        try:
+            await ctx.defer()
+        except Exception:
+            pass
+
         if not ctx.author.voice: return await ctx.send("❌ Vào voice đi bạn ơi!")
-        
-        await ctx.defer()
         status_msg = await ctx.send("🔍 Đang khởi động hệ thống âm thanh...")
         
         vc = ctx.voice_client
