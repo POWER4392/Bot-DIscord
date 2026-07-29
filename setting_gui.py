@@ -49,23 +49,24 @@ def load_gui_settings():
 gui_settings = load_gui_settings()
 
 def _remote_request(action, extra_payload=None):
+    default_secret = os.environ.get("API_SECRET") or "BOT_SECRET_KEY_2026"
     try:
         url = entry_remote_url.get().strip().rstrip("/")
-        key = entry_remote_key.get().strip()
+        key = entry_remote_key.get().strip() or default_secret
     except NameError:
         active = gui_settings.get("active_profile", "Default")
         profile = gui_settings.get("profiles", {}).get(active, {})
         url = profile.get("remote_api_url", "").strip().rstrip("/")
-        key = profile.get("api_secret", "BOT_SECRET_KEY_2026").strip()
+        key = profile.get("api_secret") or default_secret
         
     # Nếu không cấu hình URL từ xa (Local mode), tự động kết nối tới Bot cục bộ trên localhost
     if not url:
         port = "8080"
-        local_key = "changeme123"
+        local_key = default_secret
         try:
             port = entry_api_port.get().strip()
             # Lấy secret key từ config đang load
-            local_key = cfg.get("api_secret", "changeme123")
+            local_key = cfg.get("api_secret") or default_secret
         except NameError:
             active = gui_settings.get("active_profile", "Default")
             profile = gui_settings.get("profiles", {}).get(active, {})
@@ -75,7 +76,7 @@ def _remote_request(action, extra_payload=None):
                     with open(config_file, "r", encoding="utf-8") as f:
                         local_cfg = json.load(f)
                         port = str(local_cfg.get("api_port", 8080))
-                        local_key = local_cfg.get("api_secret", "changeme123")
+                        local_key = local_cfg.get("api_secret") or default_secret
                 except: pass
         url = f"http://127.0.0.1:{port}"
         key = local_key
