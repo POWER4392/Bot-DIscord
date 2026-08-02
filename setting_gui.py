@@ -4,9 +4,9 @@ import json
 import os
 import subprocess
 import shutil
-import sqlite3
 import requests as http_requests
 import threading
+import time
 import psutil
 from PIL import Image, ImageTk, ImageDraw
 import customtkinter as ctk
@@ -50,59 +50,53 @@ gui_settings = load_gui_settings()
 
 def _remote_request(action, extra_payload=None):
     default_secret = os.environ.get("API_SECRET") or "BOT_SECRET_KEY_2026"
+    
+    # 1. Lấy cấu hình cổng & secret key Local
+    local_port = "8080"
+    local_key = default_secret
     try:
-        url = entry_remote_url.get().strip().rstrip("/")
-        key = entry_remote_key.get().strip() or default_secret
+        local_port = entry_api_port.get().strip() or "8080"
+        local_key = cfg.get("api_secret") or default_secret
     except NameError:
         active = gui_settings.get("active_profile", "Default")
         profile = gui_settings.get("profiles", {}).get(active, {})
-        url = profile.get("remote_api_url", "").strip().rstrip("/")
-        key = profile.get("api_secret") or default_secret
-        
-    # Nếu không cấu hình URL từ xa (Local mode), tự động kết nối tới Bot cục bộ trên localhost
-    if not url:
-        port = "8080"
-        local_key = default_secret
-        try:
-            port = entry_api_port.get().strip()
-            # Lấy secret key từ config đang load
-            local_key = cfg.get("api_secret") or default_secret
-        except NameError:
-            active = gui_settings.get("active_profile", "Default")
-            profile = gui_settings.get("profiles", {}).get(active, {})
-            config_file = profile.get("config_file", "config.json")
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, "r", encoding="utf-8") as f:
-                        local_cfg = json.load(f)
-                        port = str(local_cfg.get("api_port", 8080))
-                        local_key = local_cfg.get("api_secret") or default_secret
-                except: pass
-        url = f"http://127.0.0.1:{port}"
-        key = local_key
+        config_file = profile.get("config_file", "config.json")
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    local_cfg = json.load(f)
+                    local_port = str(local_cfg.get("api_port", 8080))
+                    local_key = local_cfg.get("api_secret") or default_secret
+            except: pass
+
+    # 2. Lấy cấu hình URL Remote nếu có
+    remote_url = ""
+    remote_key = default_secret
+    try:
+        remote_url = entry_remote_url.get().strip().rstrip("/")
+        remote_key = entry_remote_key.get().strip() or default_secret
+    except NameError:
+        active = gui_settings.get("active_profile", "Default")
+        profile = gui_settings.get("profiles", {}).get(active, {})
+        remote_url = profile.get("remote_api_url", "").strip().rstrip("/")
+        remote_key = profile.get("api_secret") or default_secret
 
     payload = {"action": action}
-    if extra_payload: payload.update(extra_payload)
+    if extra_payload:
+        payload.update(extra_payload)
 
-    # Nếu là URL từ xa: gửi trực tiếp
-    if url and "127.0.0.1" not in url and "localhost" not in url:
-        target_url = url.rstrip("/") + "/api"
+    # 3. Nếu có Remote URL hợp lệ (không phải localhost), thử gửi Remote trước
+    if remote_url and "127.0.0.1" not in remote_url and "localhost" not in remote_url:
+        target_url = remote_url.rstrip("/") + "/api"
         try:
-            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": key}, timeout=10)
-            return resp.json()
-        except:
-            return None
+            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": remote_key}, timeout=4)
+            if resp.status_code in [200, 400, 401, 403]:
+                return resp.json()
+        except Exception:
+            pass  # Nếu Remote không thể kết nối, tự động chuyển sang thử Bot Local bên dưới
 
-    # Nếu là Local mode: Thử cổng đã cấu hình và cổng dự phòng (8080, 8081, 8082)
-    candidate_ports = []
-    if not url:
-        candidate_ports.append("8080")
-    else:
-        try:
-            p = url.split(":")[-1].split("/")[0]
-            if p.isdigit(): candidate_ports.append(p)
-        except: pass
-
+    # 4. Thử kết nối Bot Local trên máy (cổng cấu hình, 8080, 8081, 8082)
+    candidate_ports = [local_port] if local_port.isdigit() else []
     for p in ["8080", "8081", "8082"]:
         if p not in candidate_ports:
             candidate_ports.append(p)
@@ -110,12 +104,16 @@ def _remote_request(action, extra_payload=None):
     for p in candidate_ports:
         target_url = f"http://127.0.0.1:{p}/api"
         try:
-            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": key}, timeout=5)
-            if resp.status_code in [200, 400, 403]:
-                return resp.json()
-        except:
+            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": local_key}, timeout=3)
+            if resp.status_code in [200, 400, 401, 403]:
+                data = resp.json()
+                if resp.status_code in [401, 403]:
+                    data["error"] = f"Lỗi xác thực API ({resp.status_code}): Key xác thực không khớp. Kiểm tra lại Secret Key!"
+                return data
+        except Exception:
             continue
-    return None
+
+    return {"ok": False, "error": "Chưa bật Bot hoặc không kết nối được tới API Server."}
 
 
 def load_current_config():
@@ -137,7 +135,8 @@ def load_current_config():
 
 def get_server_data():
     resp = _remote_request("GET_SERVER_DATA")
-    if resp and resp.get("ok"): return resp.get("data", {})
+    if resp and resp.get("ok") and resp.get("data"):
+        return resp.get("data")
     
     # Fallback to local config's servers list if offline
     fallback_data = {}
@@ -150,13 +149,14 @@ def get_server_data():
                 local_cfg = json.load(f)
                 for sid, sval in local_cfg.get("servers", {}).items():
                     s_name = sval.get("name") if isinstance(sval, dict) and sval.get("name") else f"Server {sid}"
+                    clean_name = s_name.replace(" (Offline)", "").replace(" (Offline/Chưa kết nối)", "")
                     fallback_data[sid] = {
-                        "name": f"{s_name} (Offline)",
+                        "name": f"{clean_name} (Offline)",
                         "channels": sval.get("cached_channels", []) if isinstance(sval, dict) else [],
                         "roles": sval.get("cached_roles", []) if isinstance(sval, dict) else [],
                         "categories": sval.get("cached_categories", []) if isinstance(sval, dict) else []
                     }
-    except: pass
+    except Exception: pass
     return fallback_data
 
 def get_server_display_name(sid, sdata):
@@ -224,23 +224,20 @@ def update_status_label():
         if 'lbl_status' in globals():
             lbl_status.configure(text=f"TRẠNG THÁI: ĐÃ DỪNG ({active})", text_color="#DA373C")
 
-def stop_bot():
-    active = gui_settings["active_profile"]
-    profile = gui_settings["profiles"].get(active)
-    if not profile: return
+def stop_bot_sync(profile_name=None):
+    if not profile_name:
+        profile_name = gui_settings.get("active_profile", "Default")
+    profile = gui_settings["profiles"].get(profile_name)
+    config_file = profile.get("config_file", "config.json") if profile else "config.json"
     
-    config_file = profile.get("config_file", "config.json")
-    
-    # Stop tracked process
-    proc = bot_processes.get(active)
+    proc = bot_processes.get(profile_name)
     if proc:
         try:
             for child in proc.children(recursive=True): child.kill()
             proc.kill()
         except: pass
-        bot_processes[active] = None
+        bot_processes[profile_name] = None
         
-    # Stop system processes matching config
     current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
     for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
@@ -253,38 +250,44 @@ def stop_bot():
                         for child in spider.children(recursive=True): child.kill()
                         spider.kill()
         except: pass
-    update_status_label()
+
+def stop_bot():
+    def _bg_stop():
+        active = gui_settings.get("active_profile", "Default")
+        stop_bot_sync(active)
+        root.after(0, update_status_label)
+    threading.Thread(target=_bg_stop, daemon=True).start()
 
 def start_bot():
-    active = gui_settings["active_profile"]
-    profile = gui_settings["profiles"].get(active)
-    if not profile: return
-    
-    config_file = profile.get("config_file", "config.json")
-    
-    stop_bot()
-    try:
-        import sys
-        if not os.path.exists(config_file):
-            default_cfg = {
-                "token": "",
-                "prefix": "!",
-                "api_port": 8080,
-                "database_name": active.lower() + "_db"
-            }
-            with open(config_file, "w", encoding="utf-8") as f:
-                json.dump(default_cfg, f, indent=4, ensure_ascii=False)
-                
-        # Tự động phát hiện virtual environment (.venv) để dùng Python chuẩn
-        python_exe = sys.executable
-        if os.name == 'nt' and os.path.exists(os.path.join(".venv", "Scripts", "python.exe")):
-            python_exe = os.path.join(".venv", "Scripts", "python.exe")
-        elif os.path.exists(os.path.join(".venv", "bin", "python")):
-            python_exe = os.path.join(".venv", "bin", "python")
+    def _bg_start():
+        active = gui_settings.get("active_profile", "Default")
+        profile = gui_settings["profiles"].get(active)
+        if not profile: return
+        config_file = profile.get("config_file", "config.json")
 
-        bot_processes[active] = subprocess.Popen([python_exe, "main.py", f"--config={config_file}"])
-        update_status_label()
-    except Exception as e: messagebox.showerror("Lỗi", f"Không thể bật Bot: {e}")
+        stop_bot_sync(active)
+        time.sleep(0.5)
+
+        try:
+            import sys
+            if not os.path.exists(config_file):
+                default_cfg = {"token": "", "prefix": "!", "api_port": 8080}
+                with open(config_file, "w", encoding="utf-8") as f:
+                    json.dump(default_cfg, f, indent=4, ensure_ascii=False)
+
+            python_exe = sys.executable
+            if os.name == 'nt' and os.path.exists(os.path.join(".venv", "Scripts", "python.exe")):
+                python_exe = os.path.join(".venv", "Scripts", "python.exe")
+            elif os.path.exists(os.path.join(".venv", "bin", "python")):
+                python_exe = os.path.join(".venv", "bin", "python")
+
+            bot_processes[active] = subprocess.Popen([python_exe, "main.py", f"--config={config_file}"])
+            time.sleep(1.0)
+            root.after(0, update_status_label)
+        except Exception as e:
+            root.after(0, lambda: messagebox.showerror("Lỗi", f"Không thể bật Bot: {e}"))
+
+    threading.Thread(target=_bg_start, daemon=True).start()
 
 def select_file(entry_widget, title, types):
     source_path = filedialog.askopenfilename(title=title, filetypes=types)
@@ -364,6 +367,7 @@ def save_settings():
         cfg["prefix"] = _prefix_val if _prefix_val else "!"
         cfg["api_port"] = int(entry_api_port.get().strip()) if entry_api_port.get().strip().isdigit() else 8080
         cfg["gemini_api_key"] = entry_gemini_key.get().strip()
+        cfg["openai_api_key"] = entry_openai_key.get().strip()
 
         cfg["cmd_play"] = entry_cmd_play.get()
         cfg["cmd_stop"] = entry_cmd_stop.get()
@@ -453,17 +457,23 @@ def save_settings():
         return False, str(e)
 
 def save_and_reset():
-    ok, mode_or_err = save_settings()
-    if not ok:
-        messagebox.showwarning("Cảnh Báo Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Server Cloud:\n\n❌ {mode_or_err}\n\nBot Local vẫn được khởi động lại với cấu hình mới!")
-        start_bot()
-        return
-        
-    if mode_or_err == "cloud":
-        messagebox.showinfo("Thành Công Cloud", "Đã lưu và đồng bộ thành công toàn bộ dữ liệu cấu hình (Tiền tố, Lệnh tùy biến) lên Cloud Server!")
-    else:
-        messagebox.showinfo("Thành Công Local", "Đã lưu cấu hình cục bộ và khởi động lại Bot thành công!")
-    start_bot()
+    def _bg_save():
+        ok, mode_or_err = save_settings()
+        if not ok:
+            root.after(0, lambda: messagebox.showwarning("Cảnh Báo Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Server Remote:\n\n❌ {mode_or_err}\n\nBot vẫn duy trì hoạt động."))
+            return
+            
+        active = gui_settings.get("active_profile", "Default")
+        resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
+        if resp and resp.get("ok"):
+            root.after(0, lambda: messagebox.showinfo("Thành Công (Hot-Reload)", "✅ Đã lưu & đồng bộ Cấu Hình NÓNG thành công!\n\nBot vẫn đang ONLINE 24/7 không bị gián đoạn kết nối."))
+        else:
+            if not is_bot_running(active):
+                root.after(0, lambda: messagebox.showinfo("Thành Công Local", "✅ Đã lưu cấu hình cục bộ thành công! (Bấm ▶ CHẠY BOT để khởi động)"))
+            else:
+                root.after(0, lambda: messagebox.showinfo("Thành Công Local", "✅ Đã lưu cấu hình cục bộ thành công!"))
+
+    threading.Thread(target=_bg_save, daemon=True).start()
 
 # --- GIAO DIỆN CHÍNH ---
 ctk.set_appearance_mode("dark")
@@ -492,7 +502,13 @@ def reload_gui_inputs():
     entry_token.delete(0, tk.END); entry_token.insert(0, cfg.get("token", ""))
     entry_prefix.delete(0, tk.END); entry_prefix.insert(0, cfg.get("prefix", "!"))
     entry_api_port.delete(0, tk.END); entry_api_port.insert(0, str(cfg.get("api_port", 8080)))
-    entry_gemini_key.delete(0, tk.END); entry_gemini_key.insert(0, cfg.get("gemini_api_key", os.environ.get("GEMINI_API_KEY", "")))
+    entry_openai_key.delete(0, tk.END); entry_openai_key.insert(0, cfg.get("openai_api_key", os.environ.get("OPENAI_API_KEY", "")))
+    if 'entry_openai_model' in globals():
+        entry_openai_model.delete(0, tk.END); entry_openai_model.insert(0, cfg.get("openai_model", "gpt-4o-mini"))
+    if 'entry_ai_channel' in globals():
+        entry_ai_channel.delete(0, tk.END); entry_ai_channel.insert(0, cfg.get("ai_channel_id", ""))
+    if 'entry_ai_prompt' in globals():
+        entry_ai_prompt.delete(0, tk.END); entry_ai_prompt.insert(0, cfg.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện."))
     
     entry_cmd_play.delete(0, tk.END); entry_cmd_play.insert(0, cfg.get("cmd_play", "play"))
     entry_cmd_stop.delete(0, tk.END); entry_cmd_stop.insert(0, cfg.get("cmd_stop", "stop"))
@@ -686,10 +702,80 @@ ctk.CTkLabel(_sh, text="🔐  BẢO MẬT & XÁC THỰC",
              font=("Segoe UI", 13, "bold"), text_color="#DA373C").pack(side="left")
 ctk.CTkLabel(_sh, text="⚠️  Không chia sẻ cho bất kỳ ai!",
              font=("Segoe UI", 10), text_color="#FEE75C").pack(side="left", padx=(10, 0))
-entry_token      = make_secret_field(fc_secret, "🤖  DISCORD BOT TOKEN:", "token")
-entry_gemini_key = make_secret_field(fc_secret, "🧠  GEMINI AI API KEY:", "gemini_api_key")
-entry_api_port   = mki(fc_secret, "🔌  LOCAL API PORT (Webserver):", "api_port", "8080")
+entry_token    = make_secret_field(fc_secret, "🤖  DISCORD BOT TOKEN:", "token")
+entry_api_port = mki(fc_secret, "🔌  LOCAL API PORT (Webserver):", "api_port", "8080")
 ctk.CTkFrame(fc_secret, fg_color="transparent", height=4).pack()
+
+
+# — 1.5. CẤU HÌNH API AI CHUYÊN BIỆT (CHATGPT / OPENAI & GOOGLE GEMINI) —
+fc_ai_config = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
+                            border_width=1, border_color="#5865F2")
+fc_ai_config.pack(fill="x", padx=5, pady=(4, 6))
+
+_ai_h = ctk.CTkFrame(fc_ai_config, fg_color="transparent")
+_ai_h.pack(fill="x", padx=14, pady=(8, 0))
+ctk.CTkLabel(_ai_h, text="🤖  CẤU HÌNH API AI CHUYÊN BIỆT (CHATGPT & GOOGLE GEMINI)",
+             font=("Segoe UI", 13, "bold"), text_color="#5865F2").pack(side="left")
+ctk.CTkLabel(_ai_h, text="⚡ Đồng bộ ngay khi lưu (Local & Cloud)",
+             font=("Segoe UI", 10), text_color="#57F287").pack(side="left", padx=(10, 0))
+
+entry_openai_key   = make_secret_field(fc_ai_config, "🧠  CHATGPT (OPENAI) API KEY:", "openai_api_key")
+entry_openai_model = mki(fc_ai_config, "🤖  OPENAI MODEL (gpt-4o-mini / gpt-4o):", "openai_model", "gpt-4o-mini")
+entry_gemini_key   = make_secret_field(fc_ai_config, "💎  GOOGLE GEMINI API KEY:", "gemini_api_key")
+entry_ai_channel   = mki(fc_ai_config, "📺  AI CHAT CHANNEL ID:", "ai_channel_id", "")
+entry_ai_prompt    = mki(fc_ai_config, "💬  AI SYSTEM PROMPT:", "ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
+
+def save_ai_config_action():
+    def _bg_ai():
+        try:
+            okey = entry_openai_key.get().strip()
+            gkey = entry_gemini_key.get().strip()
+            mname = entry_openai_model.get().strip() or "gpt-4o-mini"
+            chid = entry_ai_channel.get().strip()
+            prompt = entry_ai_prompt.get().strip()
+
+            cfg["openai_api_key"] = okey
+            cfg["gemini_api_key"] = gkey
+            cfg["openai_model"] = mname
+            cfg["ai_channel_id"] = chid
+            cfg["ai_system_prompt"] = prompt
+            if okey and not gkey:
+                cfg["ai_provider"] = "openai"
+            elif gkey and not okey:
+                cfg["ai_provider"] = "gemini"
+
+            if okey:
+                os.environ["OPENAI_API_KEY"] = okey
+            if gkey:
+                os.environ["GEMINI_API_KEY"] = gkey
+
+            active = gui_settings.get("active_profile", "Default")
+            profile = gui_settings.get("profiles", {}).get(active, {})
+            config_file = profile.get("config_file", "config.json")
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=4, ensure_ascii=False)
+
+            payload = {
+                "openai_api_key": okey,
+                "gemini_api_key": gkey,
+                "openai_model": mname,
+                "ai_channel_id": chid,
+                "ai_system_prompt": prompt,
+                "ai_provider": cfg.get("ai_provider", "openai")
+            }
+            _remote_request("SET_AI_CONFIG", {"payload": payload})
+
+            root.after(0, lambda: messagebox.showinfo("Thành công", "✅ Đã lưu & đồng bộ Cấu hình API AI (OpenAI & Gemini) thành công!"))
+        except Exception as ex:
+            root.after(0, lambda: messagebox.showerror("Lỗi", f"❌ Lỗi khi đồng bộ API AI: {ex}"))
+
+    threading.Thread(target=_bg_ai, daemon=True).start()
+
+ctk.CTkButton(fc_ai_config,
+               text="💾 LƯU & ĐỒNG BỘ API AI (LOCAL & CLOUD)",
+               height=34, width=320,
+               font=("Segoe UI", 12, "bold"), fg_color="#5865F2", hover_color="#4752C4",
+               command=save_ai_config_action).pack(pady=(6, 12))
 
 
 fc_local_ctrl = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
@@ -1089,24 +1175,39 @@ def btn_add_rr_role():
 ctk.CTkButton(f_rr_controls, text="➕ Thêm Role", width=100, command=btn_add_rr_role).pack(side="left")
 
 def btn_spawn_rr():
-    if not current_server_id: return messagebox.showwarning("Lỗi", "Vui lòng chọn Server!")
-    c_val = combo_rr_channel.get()
-    if c_val == "Không Yêu Cầu": return messagebox.showerror("Lỗi", "Chưa chọn kênh để gửi Menu!")
-    chan_id = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == c_val), None)
-    title = entry_rr_title.get().strip() or "Bảng Lựa Chọn Vai Trò"
-    panel_desc = entry_rr_desc.get().strip()
-    
-    if not current_rr_roles: return messagebox.showerror("Lỗi", "Vui lòng thêm ít nhất 1 Role!")
-    
-    payload = json.dumps({"guild_id": current_server_id, "channel_id": chan_id, "title": title, "desc": panel_desc, "roles": current_rr_roles})
-    
-    try:
-        resp = _remote_request("SPAWN_RR_PANEL", {"payload": json.loads(payload)})
-        if resp and resp.get("ok"):
-            messagebox.showinfo("Thành công", "Đã gửi lệnh cho Bot! Menu Role sẽ xuất hiện trên kênh chỉ sau 3 giây.")
-        else:
-            messagebox.showerror("Lỗi", "Bot không phản hồi lệnh SPAWN_RR_PANEL.")
-    except Exception as e: messagebox.showerror("Lỗi API", str(e))
+    def _bg_spawn():
+        active = gui_settings.get("active_profile", "Default")
+        if not current_server_id:
+            root.after(0, lambda: messagebox.showwarning("Lỗi", "Vui lòng chọn Server!"))
+            return
+        c_val = combo_rr_channel.get()
+        if c_val == "Không Yêu Cầu":
+            root.after(0, lambda: messagebox.showerror("Lỗi", "Chưa chọn kênh để gửi Menu!"))
+            return
+        chan_id = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == c_val), None)
+        title = entry_rr_title.get().strip() or "Bảng Lựa Chọn Vai Trò"
+        panel_desc = entry_rr_desc.get().strip()
+        
+        if not current_rr_roles:
+            root.after(0, lambda: messagebox.showerror("Lỗi", "Vui lòng thêm ít nhất 1 Role!"))
+            return
+            
+        payload = json.dumps({"guild_id": current_server_id, "channel_id": chan_id, "title": title, "desc": panel_desc, "roles": current_rr_roles})
+        
+        try:
+            resp = _remote_request("SPAWN_RR_PANEL", {"payload": json.loads(payload)})
+            if resp and resp.get("ok"):
+                root.after(0, lambda: messagebox.showinfo("Thành công", "✅ Đã gửi lệnh cho Bot! Menu Role sẽ xuất hiện trên kênh Discord chỉ sau 3 giây."))
+            else:
+                err_text = resp.get("error") if (resp and resp.get("error")) else "Chưa bật Bot hoặc không kết nối được tới API Server."
+                if not is_bot_running(active):
+                    root.after(0, lambda: messagebox.showerror("Bot Đang Dừng", "⚠️ Bot hiện chưa được BẬT!\n\nVui lòng nhấn nút ▶ CHẠY BOT ở mục TRẠNG THÁI & ĐIỀU KHIỂN LOCAL trước khi phát bảng Role lên Server Discord."))
+                else:
+                    root.after(0, lambda: messagebox.showerror("Lỗi API", f"⚠️ Bot không phản hồi lệnh SPAWN_RR_PANEL.\n\nChi tiết: {err_text}"))
+        except Exception as e:
+            root.after(0, lambda: messagebox.showerror("Lỗi API", str(e)))
+
+    threading.Thread(target=_bg_spawn, daemon=True).start()
 
 ctk.CTkButton(f_rr, text="▶ PHÁT BẢNG MÀU LÊN SERVER", fg_color="#23A559", font=("Segoe UI", 12, "bold"), command=btn_spawn_rr).pack(pady=15)
 
@@ -1465,6 +1566,46 @@ def check_status_loop():
     except Exception as e:
         print(f"Lỗi loop trạng thái: {e}")
     root.after(2000, check_status_loop)
+
+def stop_all_processes():
+    """Tắt toàn bộ tiến trình Bot (main.py) liên quan khi đóng GUI."""
+    current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
+    for name, proc in list(bot_processes.items()):
+        if proc:
+            try:
+                for child in proc.children(recursive=True):
+                    child.kill()
+                proc.kill()
+            except Exception:
+                pass
+            bot_processes[name] = None
+
+    for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmd = proc_info.info.get('cmdline') or []
+            cmd_str = " ".join(cmd).lower()
+            if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+                if any(current_dir in os.path.normpath(arg).lower() for arg in cmd):
+                    spider = psutil.Process(proc_info.info['pid'])
+                    for child in spider.children(recursive=True):
+                        child.kill()
+                    spider.kill()
+        except Exception:
+            pass
+
+def on_closing():
+    try:
+        stop_all_processes()
+    except Exception as e:
+        print(f"[GUI Shutdown Error] {e}")
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+        sys.exit(0)
+
+root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Load GUI fields with the active profile config
 reload_gui_inputs()
