@@ -507,6 +507,7 @@ class AIChatbot(commands.Cog):
                 prompt_tokens = 0
                 completion_tokens = 0
                 total_tokens = 0
+                reply_text = ""
 
                 # A. XỬ LÝ VỚI OPENAI (CHATGPT)
                 if self.provider == "openai":
@@ -594,8 +595,12 @@ class AIChatbot(commands.Cog):
                         else:
                             raise oai_err
 
-                # B. XỬ LÝ VỚI GOOGLE GEMINI
-                else:
+                # B. XỬ LÝ VỚI GOOGLE GEMINI (Hoặc Fallback từ OpenAI)
+                if self.provider == "gemini" and not reply_text:
+                    models_to_try = [self.model_name, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-flash-latest"]
+                    last_g_ex = None
+                    response = None
+
                     if image_target:
                         image_bytes = await image_target.read()
                         image_pil = PIL.Image.open(io.BytesIO(image_bytes))
@@ -609,11 +614,21 @@ class AIChatbot(commands.Cog):
 
                         self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
 
-                        response = await self.bot.loop.run_in_executor(
-                            None,
-                            lambda: self.gemini_client.models.generate_content(model=self.model_name, contents=[prompt, image_pil])
-                        )
-                        reply_text = response.text
+                        for m in dict.fromkeys(models_to_try):
+                            try:
+                                response = await self.bot.loop.run_in_executor(
+                                    None,
+                                    lambda m_curr=m: self.gemini_client.models.generate_content(model=m_curr, contents=[prompt, image_pil])
+                                )
+                                self.model_name = m
+                                break
+                            except Exception as m_err:
+                                last_g_ex = m_err
+                                continue
+                        if response and hasattr(response, "text"):
+                            reply_text = response.text
+                        else:
+                            raise last_g_ex
                     else:
                         self._save_message_to_db(guild_id, user_id, "user", content)
                         try:
@@ -624,16 +639,26 @@ class AIChatbot(commands.Cog):
                             )
                             reply_text = response.text
                         except Exception as ex:
-                            print(f"[AI Session Warning] Lỗi Gemini session chat: {ex}")
+                            print(f"[AI Session Warning] Lỗi Gemini session chat ({ex}), thử generate_content...")
                             self.chat_sessions.pop((guild_id, user_id), None)
-                            response = await self.bot.loop.run_in_executor(
-                                None,
-                                lambda: self.gemini_client.models.generate_content(
-                                    model=self.model_name,
-                                    contents=f"{system_prompt}\n\n{prompt_with_rag}"
-                                )
-                            )
-                            reply_text = response.text
+                            for m in dict.fromkeys(models_to_try):
+                                try:
+                                    response = await self.bot.loop.run_in_executor(
+                                        None,
+                                        lambda m_curr=m: self.gemini_client.models.generate_content(
+                                            model=m_curr,
+                                            contents=f"{system_prompt}\n\n{prompt_with_rag}"
+                                        )
+                                    )
+                                    self.model_name = m
+                                    break
+                                except Exception as m_err:
+                                    last_g_ex = m_err
+                                    continue
+                            if response and hasattr(response, "text"):
+                                reply_text = response.text
+                            else:
+                                raise (last_g_ex or ex)
 
                     if hasattr(response, "usage_metadata") and response.usage_metadata:
                         prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
