@@ -1,13 +1,16 @@
-# Updated by POWER4392 (Backend Developer) — Issue #32 Tuan 4.1
+# Updated by POWER4392 (Backend Developer) — OpenAI (ChatGPT) & Gemini Multi-Provider Support
 import discord
 from discord.ext import commands
 from discord import app_commands
 from google import genai
 from google.genai import types
+import openai
 import os
 import time
 import PIL.Image
 import io
+import base64
+import json
 
 from core.database import cursor, conn, db_lock
 
@@ -19,12 +22,12 @@ class AIChatbot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         from core.shared import config
-        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
-        self.api_key = self.sanitize_key(raw_key)
-        self.model_name = "gemini-2.5-flash"
-        self.client = None
+        self.provider = "openai"  # "openai" hoặc "gemini"
+        self.model_name = "gpt-4o-mini"
+        self.gemini_client = None
+        self.openai_client = None
 
-        # In-memory chat sessions: {(guild_id, user_id): genai.chats.Chat}
+        # In-memory chat sessions cho Gemini: {(guild_id, user_id): genai.chats.Chat}
         self.chat_sessions: dict = {}
 
         # Anti-Spam Sliding Window: {user_id: [timestamps]}
@@ -37,8 +40,7 @@ class AIChatbot(commands.Cog):
         self.max_messages_in_window = 5
         self.max_duplicates = 3
 
-        if self.api_key:
-            self.ensure_model_initialized()
+        self.ensure_model_initialized()
 
     def sanitize_key(self, key: str) -> str:
         if not key:
@@ -49,15 +51,45 @@ class AIChatbot(commands.Cog):
         return k
 
     def ensure_model_initialized(self) -> bool:
-        if self.client:
-            return True
         from core.shared import config
-        raw_key = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
-        key = self.sanitize_key(raw_key)
-        if not key:
+        raw_okey = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or config.get("openai_key")
+        raw_gkey = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+
+        okey = self.sanitize_key(raw_okey)
+        gkey = self.sanitize_key(raw_gkey)
+
+        preferred = str(config.get("ai_provider", "")).strip().lower()
+
+        if preferred == "openai" and okey:
+            if self._init_openai(okey):
+                return True
+            if gkey and self._init_gemini(gkey):
+                return True
+        elif preferred == "gemini" and gkey:
+            if self._init_gemini(gkey):
+                return True
+            if okey and self._init_openai(okey):
+                return True
+
+        if okey and self._init_openai(okey):
+            return True
+        elif gkey and self._init_gemini(gkey):
+            return True
+        return False
+
+    def _init_openai(self, key: str) -> bool:
+        try:
+            from core.shared import config
+            self.openai_client = openai.OpenAI(api_key=key)
+            self.provider = "openai"
+            self.model_name = config.get("openai_model", "gpt-4o-mini")
+            print(f"[AI] OpenAI API nạp thành công với model {self.model_name}.")
+            return True
+        except Exception as ex:
+            print(f"[AI Warning] Không nạp được OpenAI Client: {ex}")
             return False
 
-        self.api_key = key
+    def _init_gemini(self, key: str) -> bool:
         models_to_try = [
             "gemini-2.5-flash",
             "gemini-2.0-flash",
@@ -68,29 +100,50 @@ class AIChatbot(commands.Cog):
         for m_name in models_to_try:
             try:
                 self.model_name = m_name
-                self.client = genai.Client(api_key=self.api_key)
+                self.gemini_client = genai.Client(api_key=key)
+                self.provider = "gemini"
                 print(f"[AI] Gemini API nạp thành công với model {self.model_name}.")
                 return True
             except Exception as ex:
                 print(f"[AI Warning] Không nạp được model {m_name}: {ex}")
                 continue
-
         return False
 
     # ------------------------------------------------------------------
-    # Helper: lấy hoặc tạo chat session cho (guild_id, user_id)
+    # Helper: Gemini Session
     # ------------------------------------------------------------------
-    def _get_session(self, guild_id: int, user_id: int, system_prompt: str):
+    def _get_gemini_session(self, guild_id: int, user_id: int, system_prompt: str):
         key = (guild_id, user_id)
         if key not in self.chat_sessions:
-            config = types.GenerateContentConfig(system_instruction=system_prompt)
+            config_gen = types.GenerateContentConfig(system_instruction=system_prompt)
             history = self._load_history_from_db(guild_id, user_id)
-            self.chat_sessions[key] = self.client.chats.create(
+            self.chat_sessions[key] = self.gemini_client.chats.create(
                 model=self.model_name,
-                config=config,
+                config=config_gen,
                 history=history
             )
         return self.chat_sessions[key]
+
+    # ------------------------------------------------------------------
+    # Helper: OpenAI Message History
+    # ------------------------------------------------------------------
+    def _get_openai_messages(self, guild_id: int, user_id: int, system_prompt: str, prompt_with_rag: str) -> list:
+        messages = [{"role": "system", "content": system_prompt}]
+        try:
+            with db_lock:
+                cursor.execute(
+                    "SELECT role, content FROM ai_conversations WHERE guild_id=? AND user_id=? ORDER BY timestamp ASC LIMIT ?",
+                    (str(guild_id), str(user_id), MAX_HISTORY_PER_USER * 2)
+                )
+                rows = cursor.fetchall()
+            for role, content in rows:
+                o_role = "assistant" if role in ("model", "assistant") else "user"
+                messages.append({"role": o_role, "content": content})
+        except Exception as e:
+            print(f"[AI DB] Loi doc lich su cho OpenAI: {e}")
+        
+        messages.append({"role": "user", "content": prompt_with_rag})
+        return messages
 
     # ------------------------------------------------------------------
     # DB: Lưu lịch sử hội thoại
@@ -103,8 +156,6 @@ class AIChatbot(commands.Cog):
                     (str(guild_id), str(user_id), role, content, time.time())
                 )
                 conn.commit()
-                # Giữ chỉ MAX_HISTORY_PER_USER*2 bản ghi mới nhất
-                # SQLite không hỗ trợ LIMIT trong subquery của DELETE → dùng 2 bước
                 cursor.execute(
                     "SELECT id FROM ai_conversations WHERE guild_id=? AND user_id=? "
                     "ORDER BY timestamp DESC LIMIT ?",
@@ -123,7 +174,6 @@ class AIChatbot(commands.Cog):
             print(f"[AI DB] Loi luu lich su: {e}")
 
     def _load_history_from_db(self, guild_id: int, user_id: int) -> list:
-        """Trả về history ở định dạng genai Content list."""
         try:
             with db_lock:
                 cursor.execute(
@@ -140,7 +190,6 @@ class AIChatbot(commands.Cog):
             return []
 
     def _clear_history_in_db(self, guild_id: int, user_id: int = None):
-        """Xóa lịch sử theo guild hoặc user cụ thể."""
         try:
             with db_lock:
                 if user_id:
@@ -148,14 +197,12 @@ class AIChatbot(commands.Cog):
                         "DELETE FROM ai_conversations WHERE guild_id=? AND user_id=?",
                         (str(guild_id), str(user_id))
                     )
-                    # Xóa session in-memory
                     self.chat_sessions.pop((guild_id, user_id), None)
                 else:
                     cursor.execute(
                         "DELETE FROM ai_conversations WHERE guild_id=?",
                         (str(guild_id),)
                     )
-                    # Xóa tất cả session in-memory của guild
                     keys_to_del = [k for k in self.chat_sessions if k[0] == guild_id]
                     for k in keys_to_del:
                         del self.chat_sessions[k]
@@ -164,14 +211,13 @@ class AIChatbot(commands.Cog):
             print(f"[AI DB] Loi xoa lich su: {e}")
 
     # ------------------------------------------------------------------
-    # Helper: RAG retrieval from server rules/instructions
+    # Helper: RAG retrieval from server rules
     # ------------------------------------------------------------------
     def _retrieve_relevant_rules(self, query: str) -> str:
         docs_dir = "docs"
         if not os.path.exists(docs_dir):
             return ""
         try:
-            # Thu thập toàn bộ nội dung từ các file *.txt trong docs/
             all_contents = []
             for file_name in os.listdir(docs_dir):
                 if file_name.endswith(".txt"):
@@ -181,21 +227,17 @@ class AIChatbot(commands.Cog):
                             all_contents.append(f.read())
                     except Exception as fe:
                         print(f"[RAG] Loi khi doc file {file_name}: {fe}")
-            
+
             if not all_contents:
                 return ""
-            
+
             content = "\n\n".join(all_contents)
-            
-            # Chia nhỏ theo tiêu đề phần (Markdown headers)
             sections = content.split("\n## ")
             relevant_sections = []
-            
-            # Tách từ khóa từ câu hỏi (chuyển thường, bỏ dấu câu và chỉ lấy từ dài hơn 2 ký tự)
+
             words = [w.strip(",.?/!").lower() for w in query.split() if len(w) > 2]
-            
+
             for section in sections:
-                # Thêm lại ký tự ## nếu không phải phần đầu tiên
                 full_section = ("## " + section) if not section.startswith("# ") else section
                 score = 0
                 section_lower = full_section.lower()
@@ -204,16 +246,14 @@ class AIChatbot(commands.Cog):
                         score += 1
                 if score > 0:
                     relevant_sections.append((score, full_section))
-            
+
             if not relevant_sections:
                 return ""
-            
-            # Sắp xếp theo score giảm dần và lấy tối đa 2 phần liên quan nhất
+
             relevant_sections.sort(key=lambda x: x[0], reverse=True)
             top_sections = [sec[1] for sec in relevant_sections[:2]]
-            
-            context = "\n\n".join(top_sections)
-            return context
+
+            return "\n\n".join(top_sections)
         except Exception as e:
             print(f"[RAG Error] Loi khi truy van luat le: {e}")
             return ""
@@ -234,7 +274,7 @@ class AIChatbot(commands.Cog):
             print(f"[AI DB] Loi luu thong ke token: {e}")
 
     # ------------------------------------------------------------------
-    # on_message: phản hồi trong AI channel, khi tag bot, hoặc khi reply tin nhắn bot
+    # on_message
     # ------------------------------------------------------------------
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -255,7 +295,6 @@ class AIChatbot(commands.Cog):
         if not (is_mentioned or is_reply_to_bot or is_ai_channel):
             return
 
-        # Anti-Spam check
         is_spam = await self.check_spam_protection(message)
         if is_spam:
             return
@@ -272,8 +311,8 @@ class AIChatbot(commands.Cog):
 
         if not self.ensure_model_initialized():
             await message.reply(
-                "⚠️ **AI Chatbot chưa có Gemini API Key!**\n"
-                "👉 Dán API Key tại **Web Dashboard** (`https://bot-discord-2ioq.onrender.com`) hoặc qua lệnh `!setkey <key_gemini>`."
+                "⚠️ **AI Chatbot chưa được cấu hình API Key (OpenAI / Gemini)!**\n"
+                "👉 Dán API Key tại **Web Dashboard** hoặc dùng lệnh `!setkey <sk-..._hoac_key_gemini>`."
             )
             return
 
@@ -282,56 +321,95 @@ class AIChatbot(commands.Cog):
     # ------------------------------------------------------------------
     # Hybrid Command: !setkey <key> / /setkey
     # ------------------------------------------------------------------
-    @commands.hybrid_command(name="setkey", description="Cập nhật Gemini API Key cho Bot (lệnh !setkey hoặc /setkey).")
+    @commands.hybrid_command(name="setkey", description="Cập nhật OpenAI (sk-...) hoặc Gemini API Key cho Bot.")
     async def setkey_cmd(self, ctx: commands.Context, key: str):
         key = self.sanitize_key(key)
         if not key or len(key) < 15:
-            await ctx.send("❌ **Lỗi:** Key quá ngắn hoặc không hợp lệ. Gemini API Key từ Google AI Studio thường bắt đầu bằng `AIzaSy...`.")
+            await ctx.send("❌ **Lỗi:** Key quá ngắn hoặc không hợp lệ. OpenAI Key bắt đầu bằng `sk-...`, Gemini Key bắt đầu bằng `AIzaSy...`.")
             return
 
         from core.shared import config, config_file
-        import json
-        config["gemini_api_key"] = key
-        os.environ["GEMINI_API_KEY"] = key
+
+        is_openai_key = key.startswith("sk-")
+
+        if is_openai_key:
+            config["openai_api_key"] = key
+            config["ai_provider"] = "openai"
+            os.environ["OPENAI_API_KEY"] = key
+        else:
+            config["gemini_api_key"] = key
+            config["ai_provider"] = "gemini"
+            os.environ["GEMINI_API_KEY"] = key
+
         try:
             with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"[SetKey Error] {e}")
 
-        self.client = None
+        self.openai_client = None
+        self.gemini_client = None
         self.chat_sessions.clear()
-        
+
         if self.ensure_model_initialized():
-            # Thử gửi 1 test request nhỏ để kiểm tra xem Google có chấp nhận Key không
-            try:
-                test_res = await self.bot.loop.run_in_executor(
-                    None,
-                    lambda: self.client.models.generate_content(model=self.model_name, contents="Xin chào")
-                )
-                if test_res and test_res.text:
-                    await ctx.send(f"✅ **Thành công!** Gemini API Key đã được xác thực và hoạt động 100% (Model: `{self.model_name}`). Hãy thử chat `!ai Xin chào` ngay bây giờ!")
+            if self.provider == "openai":
+                try:
+                    test_res = await self.bot.loop.run_in_executor(
+                        None,
+                        lambda: self.openai_client.chat.completions.create(
+                            model=self.model_name,
+                            messages=[{"role": "user", "content": "Xin chào"}]
+                        )
+                    )
+                    if test_res and test_res.choices:
+                        await ctx.send(f"✅ **Thành công!** OpenAI API Key (ChatGPT) đã được xác thực 100% (Model: `{self.model_name}`). Dùng lệnh `!ai Xin chào` để nhắn tin!")
+                        return
+                except Exception as test_ex:
+                    await ctx.send(f"⚠️ **Đã lưu OpenAI Key nhưng API báo lỗi:** `{str(test_ex)[:150]}`")
                     return
-            except Exception as test_ex:
-                err_text = str(test_ex)
-                if "Quota" in err_text or "429" in err_text or "RESOURCE_EXHAUSTED" in err_text:
-                    await ctx.send(f"⚠️ **Đã lưu Key nhưng bị giới hạn Hạn ngạch (Quota Limit):** Key này của bạn bị Google chặn do vượt hạn ngạch free tier (limit: 0). Hãy tạo Key từ tài khoản Google mới tại `https://aistudio.google.com/app/apikey`.")
-                    return
-                elif "API_KEY_INVALID" in err_text or "not valid" in err_text:
-                    await ctx.send(f"❌ **Đã lưu Key nhưng Google báo lỗi:** Key không hợp lệ (`API_KEY_INVALID`). Kiểm tra lại Key từ Google AI Studio!")
-                    return
-                else:
-                    await ctx.send(f"⚠️ **Đã nạp Key nhưng Google API báo lỗi:** `{err_text[:150]}`")
+            else:
+                try:
+                    test_res = await self.bot.loop.run_in_executor(
+                        None,
+                        lambda: self.gemini_client.models.generate_content(model=self.model_name, contents="Xin chào")
+                    )
+                    if test_res and test_res.text:
+                        await ctx.send(f"✅ **Thành công!** Gemini API Key đã được xác thực 100% (Model: `{self.model_name}`).")
+                        return
+                except Exception as test_ex:
+                    await ctx.send(f"⚠️ **Đã lưu Gemini Key nhưng API báo lỗi:** `{str(test_ex)[:150]}`")
                     return
 
-            await ctx.send(f"✅ Đã nạp **Gemini API Key** (Model: `{self.model_name}`).")
+            await ctx.send(f"✅ Đã nạp API Key thành công (Provider: `{self.provider}`, Model: `{self.model_name}`).")
         else:
-            await ctx.send("❌ Không thể khởi tạo mô hình Gemini với Key này. Kiểm tra lại Key từ Google AI Studio!")
+            await ctx.send("❌ Không thể khởi tạo mô hình AI với Key này. Kiểm tra lại Key của bạn!")
+
+    # ------------------------------------------------------------------
+    # Hybrid Command: !setmodel <model>
+    # ------------------------------------------------------------------
+    @commands.hybrid_command(name="setmodel", description="Đổi mô hình OpenAI (gpt-4o-mini, gpt-4o, gpt-3.5-turbo) hoặc Gemini.")
+    async def setmodel_cmd(self, ctx: commands.Context, model: str):
+        from core.shared import config, config_file
+        model = model.strip()
+        if "gpt" in model.lower():
+            config["openai_model"] = model
+            config["ai_provider"] = "openai"
+        else:
+            config["ai_provider"] = "gemini"
+        
+        try:
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"[SetModel Error] {e}")
+
+        self.ensure_model_initialized()
+        await ctx.send(f"⚙️ **Đã chuyển đổi mô hình AI:** Provider = `{self.provider}`, Model = `{self.model_name}`.")
 
     # ------------------------------------------------------------------
     # Hybrid Command: !ai <question>
     # ------------------------------------------------------------------
-    @commands.hybrid_command(name="ai", description="Hỏi AI Chatbot câu hỏi của bạn (dùng được lệnh !ai).")
+    @commands.hybrid_command(name="ai", description="Hỏi AI Chatbot câu hỏi của bạn (OpenAI / Gemini).")
     async def ai_cmd(self, ctx: commands.Context, *, question: str):
         if not self.ensure_model_initialized():
             await ctx.send("⚠️ Tính năng AI chưa được nạp Key. Dùng lệnh `!setkey <key>` để nạp Key!")
@@ -341,7 +419,7 @@ class AIChatbot(commands.Cog):
     # ------------------------------------------------------------------
     # Slash command: /ask
     # ------------------------------------------------------------------
-    @app_commands.command(name="ask", description="Hỏi AI Chatbot bất kỳ điều gì (hỗ trợ đính kèm hình ảnh)!")
+    @app_commands.command(name="ask", description="Hỏi AI Chatbot (OpenAI / Gemini) hỗ trợ đính kèm hình ảnh!")
     @app_commands.describe(question="Câu hỏi của bạn hoặc lời nhắc cho hình ảnh", image="Hình ảnh đính kèm (không bắt buộc)")
     async def ask(self, interaction: discord.Interaction, question: str, image: discord.Attachment = None):
         if not self.ensure_model_initialized():
@@ -380,7 +458,7 @@ class AIChatbot(commands.Cog):
         )
 
     # ------------------------------------------------------------------
-    # Core chat logic (dùng chung cho on_message và /ask)
+    # Core chat logic
     # ------------------------------------------------------------------
     async def _do_chat(
         self,
@@ -413,7 +491,7 @@ class AIChatbot(commands.Cog):
                     if first_att.content_type and first_att.content_type.startswith("image/"):
                         image_target = first_att
 
-                # RAG: Truy vấn luật lệ liên quan đến câu hỏi/yêu cầu của người dùng
+                # RAG: Truy vấn luật lệ liên quan
                 rag_context = self._retrieve_relevant_rules(content)
                 if rag_context:
                     prompt_with_rag = (
@@ -426,68 +504,147 @@ class AIChatbot(commands.Cog):
                     prompt_with_rag = content
 
                 start_time = time.time()
-                if image_target:
-                    # Đọc và phân tích ảnh với Gemini Vision
-                    image_bytes = await image_target.read()
-                    image_pil = PIL.Image.open(io.BytesIO(image_bytes))
-                    
-                    safety_prompt_prefix = (
-                        "Bạn là một hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
-                        "BƯỚC 1: Hãy kiểm tra kỹ xem hình ảnh đính kèm có vi phạm các tiêu chuẩn an toàn sau không:\n"
-                        "- Chứa nội dung nhạy cảm, người lớn (NSFW), khỏa thân, hoặc thô tục.\n"
-                        "- Chứa nội dung bạo lực ghê rợn, máu me, tự hại.\n"
-                        "- Chứa logo, watermark có bản quyền sở hữu trí tuệ hoặc thương hiệu thương mại lớn được bảo hộ nghiêm ngặt.\n\n"
-                        "Nếu phát hiện có vi phạm ở BƯỚC 1, bạn bắt buộc BẮT ĐẦU phản hồi chính xác bằng câu thông báo sau đây và KHÔNG giải thích gì thêm:\n"
-                        "\"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n\n"
-                        "BƯỚC 2: Nếu hình ảnh AN TOÀN, hãy trả lời bình thường bằng tiếng Việt tự nhiên và thực hiện yêu cầu của người dùng sau: "
-                    )
-                    prompt = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này dựa trên các quy định của server.'}"
-                    
-                    # Lưu tin nhắn user vào DB (chỉ lưu tin nhắn gốc)
-                    self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
-                    
-                    response = await self.bot.loop.run_in_executor(
-                        None,
-                        lambda: self.client.models.generate_content(model=self.model_name, contents=[prompt, image_pil])
-                    )
-                    reply_text = response.text
-                else:
-                    # Đàm thoại văn bản thuần qua Session
-                    self._save_message_to_db(guild_id, user_id, "user", content)
-
-                    try:
-                        session = self._get_session(guild_id, user_id, system_prompt)
-                        response = await self.bot.loop.run_in_executor(
-                            None,
-                            lambda: session.send_message(prompt_with_rag)
-                        )
-                        reply_text = response.text
-                    except Exception as ex:
-                        print(f"[AI Session Warning] Lỗi session chat, chuyển sang generate_content: {ex}")
-                        # Xóa session bị lỗi và gọi trực tiếp qua model
-                        self.chat_sessions.pop((guild_id, user_id), None)
-                        response = await self.bot.loop.run_in_executor(
-                            None,
-                            lambda: self.client.models.generate_content(model=self.model_name, contents=f"{system_prompt}\n\n{prompt_with_rag}")
-                        )
-                        reply_text = response.text
-
-                latency_ms = int((time.time() - start_time) * 1000)
-
-                # Ghi nhận thống kê token sử dụng vào DB
                 prompt_tokens = 0
                 completion_tokens = 0
                 total_tokens = 0
-                if hasattr(response, "usage_metadata") and response.usage_metadata:
-                    prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
-                    completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
-                    total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+
+                # A. XỬ LÝ VỚI OPENAI (CHATGPT)
+                if self.provider == "openai":
+                    try:
+                        if image_target:
+                            image_bytes = await image_target.read()
+                            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+                            mime_type = image_target.content_type or "image/jpeg"
+
+                            safety_prompt_prefix = (
+                                "Bạn là hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
+                                "Nếu phát hiện vi phạm NSFW, máu me, tự hại hoặc logo bản quyền lớn, bắt đầu bằng: "
+                                "\"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n"
+                                "Nếu an toàn, trả lời bình thường bằng tiếng Việt."
+                            )
+                            prompt_text = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này.'}"
+
+                            self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
+
+                            messages = [
+                                {"role": "system", "content": system_prompt},
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": prompt_text},
+                                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
+                                    ]
+                                }
+                            ]
+
+                            models_to_try = [self.model_name, "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+                            last_ex = None
+                            response = None
+                            for m in dict.fromkeys(models_to_try):
+                                try:
+                                    response = await self.bot.loop.run_in_executor(
+                                        None,
+                                        lambda m_curr=m: self.openai_client.chat.completions.create(
+                                            model=m_curr,
+                                            messages=messages
+                                        )
+                                    )
+                                    self.model_name = m
+                                    break
+                                except Exception as m_err:
+                                    last_ex = m_err
+                                    continue
+                            if not response:
+                                raise last_ex
+                        else:
+                            self._save_message_to_db(guild_id, user_id, "user", content)
+                            messages = self._get_openai_messages(guild_id, user_id, system_prompt, prompt_with_rag)
+
+                            models_to_try = [self.model_name, "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+                            last_ex = None
+                            response = None
+                            for m in dict.fromkeys(models_to_try):
+                                try:
+                                    response = await self.bot.loop.run_in_executor(
+                                        None,
+                                        lambda m_curr=m: self.openai_client.chat.completions.create(
+                                            model=m_curr,
+                                            messages=messages
+                                        )
+                                    )
+                                    self.model_name = m
+                                    break
+                                except Exception as m_err:
+                                    last_ex = m_err
+                                    continue
+                            if not response:
+                                raise last_ex
+
+                        reply_text = response.choices[0].message.content
+                        if response.usage:
+                            prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
+                            completion_tokens = getattr(response.usage, "completion_tokens", 0)
+                            total_tokens = getattr(response.usage, "total_tokens", 0)
+                    except Exception as oai_err:
+                        print(f"[AI Warning] Lỗi OpenAI ({oai_err}). Thử chuyển sang Gemini AI...")
+                        raw_gkey = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+                        gkey = self.sanitize_key(raw_gkey)
+                        if gkey and self._init_gemini(gkey):
+                            print(f"[AI Fallback] Chuyển đổi thành công sang Gemini model {self.model_name}.")
+                        else:
+                            raise oai_err
+
+                # B. XỬ LÝ VỚI GOOGLE GEMINI
+                else:
+                    if image_target:
+                        image_bytes = await image_target.read()
+                        image_pil = PIL.Image.open(io.BytesIO(image_bytes))
+
+                        safety_prompt_prefix = (
+                            "Bạn là hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
+                            "Nếu vi phạm, trả lời: \"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n"
+                            "Nếu an toàn, trả lời bình thường bằng tiếng Việt."
+                        )
+                        prompt = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này.'}"
+
+                        self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
+
+                        response = await self.bot.loop.run_in_executor(
+                            None,
+                            lambda: self.gemini_client.models.generate_content(model=self.model_name, contents=[prompt, image_pil])
+                        )
+                        reply_text = response.text
+                    else:
+                        self._save_message_to_db(guild_id, user_id, "user", content)
+                        try:
+                            session = self._get_gemini_session(guild_id, user_id, system_prompt)
+                            response = await self.bot.loop.run_in_executor(
+                                None,
+                                lambda: session.send_message(prompt_with_rag)
+                            )
+                            reply_text = response.text
+                        except Exception as ex:
+                            print(f"[AI Session Warning] Lỗi Gemini session chat: {ex}")
+                            self.chat_sessions.pop((guild_id, user_id), None)
+                            response = await self.bot.loop.run_in_executor(
+                                None,
+                                lambda: self.gemini_client.models.generate_content(
+                                    model=self.model_name,
+                                    contents=f"{system_prompt}\n\n{prompt_with_rag}"
+                                )
+                            )
+                            reply_text = response.text
+
+                    if hasattr(response, "usage_metadata") and response.usage_metadata:
+                        prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+                        completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+                        total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+
+                latency_ms = int((time.time() - start_time) * 1000)
+
                 self._save_token_usage_to_db(guild_id, user_id, prompt_tokens, completion_tokens, total_tokens, latency_ms)
+                self._save_message_to_db(guild_id, user_id, "assistant" if self.provider == "openai" else "model", reply_text)
 
-                # Lưu phản hồi của model vào DB
-                self._save_message_to_db(guild_id, user_id, "model", reply_text)
-
-                # Giới hạn 2000 ký tự (giới hạn Discord)
                 if len(reply_text) > 1990:
                     reply_text = reply_text[:1990] + "..."
 
@@ -500,13 +657,8 @@ class AIChatbot(commands.Cog):
 
             except Exception as e:
                 err_str = str(e)
-                print(f"[AI Error] Loi khi goi Gemini API: {err_str}")
-                if "401" in err_str or "API_KEY_INVALID" in err_str or "API key not valid" in err_str or "authentication credentials" in err_str:
-                    err_msg = "❌ **Lỗi Gemini API Key (401):** Key Gemini hiện tại không hợp lệ hoặc đã bị vô hiệu hóa. Hãy tạo Key mới từ `https://aistudio.google.com/app/apikey` và nạp bằng lệnh `/setkey` hoặc `!setkey <key_moi>`."
-                elif "Quota" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                    err_msg = "⚠️ **Lỗi Hạn Ngạch (Quota Limit):** API Key của bạn đã vượt quá giới hạn request miễn phí của Google. Vui lòng nạp Key Gemini mới bằng lệnh `/setkey <key_moi>`."
-                else:
-                    err_msg = f"❌ **Lỗi kết nối Gemini AI:** `{err_str[:200]}`"
+                print(f"[AI Error] Lỗi khi gọi {self.provider} API: {err_str}")
+                err_msg = f"❌ **Lỗi kết nối {self.provider.upper()} AI:** `{err_str[:200]}`"
 
                 if interaction:
                     await interaction.followup.send(err_msg)
@@ -516,13 +668,12 @@ class AIChatbot(commands.Cog):
                     await channel.send(err_msg)
 
     # ------------------------------------------------------------------
-    # Anti-Spam: Sliding Window + Duplicate detector
+    # Anti-Spam Protection
     # ------------------------------------------------------------------
     async def check_spam_protection(self, message: discord.Message) -> bool:
         user_id = message.author.id
         current_time = time.time()
 
-        # A. Sliding Window Rate Limiter
         if user_id not in self.user_message_timestamps:
             self.user_message_timestamps[user_id] = []
 
@@ -540,7 +691,6 @@ class AIChatbot(commands.Cog):
                 pass
             return True
 
-        # B. Duplicate Content Detection
         content = message.content.strip().lower()
         if content:
             last_msg = self.user_last_message.get(user_id, {"content": "", "count": 0})
