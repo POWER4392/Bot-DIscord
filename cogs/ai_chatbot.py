@@ -510,7 +510,7 @@ class AIChatbot(commands.Cog):
                 reply_text = ""
 
                 # A. XỬ LÝ VỚI OPENAI (CHATGPT)
-                if self.provider == "openai":
+                if self.provider == "openai" and not reply_text:
                     try:
                         if image_target:
                             image_bytes = await image_target.read()
@@ -595,60 +595,31 @@ class AIChatbot(commands.Cog):
                         else:
                             raise oai_err
 
-                # B. XỬ LÝ VỚI GOOGLE GEMINI (Hoặc Fallback từ OpenAI)
+                # B. XỬ LÝ VỚI GOOGLE GEMINI (Nếu Gemini là ưu tiên HOẶC nếu OpenAI bị lỗi)
                 if self.provider == "gemini" and not reply_text:
-                    models_to_try = [self.model_name, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-flash-latest"]
-                    last_g_ex = None
-                    response = None
+                    try:
+                        models_to_try = [self.model_name, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-flash-latest"]
+                        last_g_ex = None
+                        response = None
 
-                    if image_target:
-                        image_bytes = await image_target.read()
-                        image_pil = PIL.Image.open(io.BytesIO(image_bytes))
+                        if image_target:
+                            image_bytes = await image_target.read()
+                            image_pil = PIL.Image.open(io.BytesIO(image_bytes))
 
-                        safety_prompt_prefix = (
-                            "Bạn là hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
-                            "Nếu vi phạm, trả lời: \"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n"
-                            "Nếu an toàn, trả lời bình thường bằng tiếng Việt."
-                        )
-                        prompt = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này.'}"
-
-                        self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
-
-                        for m in dict.fromkeys(models_to_try):
-                            try:
-                                response = await self.bot.loop.run_in_executor(
-                                    None,
-                                    lambda m_curr=m: self.gemini_client.models.generate_content(model=m_curr, contents=[prompt, image_pil])
-                                )
-                                self.model_name = m
-                                break
-                            except Exception as m_err:
-                                last_g_ex = m_err
-                                continue
-                        if response and hasattr(response, "text"):
-                            reply_text = response.text
-                        else:
-                            raise last_g_ex
-                    else:
-                        self._save_message_to_db(guild_id, user_id, "user", content)
-                        try:
-                            session = self._get_gemini_session(guild_id, user_id, system_prompt)
-                            response = await self.bot.loop.run_in_executor(
-                                None,
-                                lambda: session.send_message(prompt_with_rag)
+                            safety_prompt_prefix = (
+                                "Bạn là hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
+                                "Nếu vi phạm, trả lời: \"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n"
+                                "Nếu an toàn, trả lời bình thường bằng tiếng Việt."
                             )
-                            reply_text = response.text
-                        except Exception as ex:
-                            print(f"[AI Session Warning] Lỗi Gemini session chat ({ex}), thử generate_content...")
-                            self.chat_sessions.pop((guild_id, user_id), None)
+                            prompt = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này.'}"
+
+                            self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
+
                             for m in dict.fromkeys(models_to_try):
                                 try:
                                     response = await self.bot.loop.run_in_executor(
                                         None,
-                                        lambda m_curr=m: self.gemini_client.models.generate_content(
-                                            model=m_curr,
-                                            contents=f"{system_prompt}\n\n{prompt_with_rag}"
-                                        )
+                                        lambda m_curr=m: self.gemini_client.models.generate_content(model=m_curr, contents=[prompt, image_pil])
                                     )
                                     self.model_name = m
                                     break
@@ -658,12 +629,126 @@ class AIChatbot(commands.Cog):
                             if response and hasattr(response, "text"):
                                 reply_text = response.text
                             else:
-                                raise (last_g_ex or ex)
+                                raise last_g_ex
+                        else:
+                            self._save_message_to_db(guild_id, user_id, "user", content)
+                            try:
+                                session = self._get_gemini_session(guild_id, user_id, system_prompt)
+                                response = await self.bot.loop.run_in_executor(
+                                    None,
+                                    lambda: session.send_message(prompt_with_rag)
+                                )
+                                reply_text = response.text
+                            except Exception as ex:
+                                print(f"[AI Session Warning] Lỗi Gemini session chat ({ex}), thử generate_content...")
+                                self.chat_sessions.pop((guild_id, user_id), None)
+                                for m in dict.fromkeys(models_to_try):
+                                    try:
+                                        response = await self.bot.loop.run_in_executor(
+                                            None,
+                                            lambda m_curr=m: self.gemini_client.models.generate_content(
+                                                model=m_curr,
+                                                contents=f"{system_prompt}\n\n{prompt_with_rag}"
+                                            )
+                                        )
+                                        self.model_name = m
+                                        break
+                                    except Exception as m_err:
+                                        last_g_ex = m_err
+                                        continue
+                                if response and hasattr(response, "text"):
+                                    reply_text = response.text
+                                else:
+                                    raise (last_g_ex or ex)
 
-                    if hasattr(response, "usage_metadata") and response.usage_metadata:
-                        prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
-                        completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
-                        total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+                        if hasattr(response, "usage_metadata") and response.usage_metadata:
+                            prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+                            completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+                            total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+                    except Exception as gem_err:
+                        print(f"[AI Warning] Lỗi Gemini ({gem_err}). Thử chuyển sang OpenAI...")
+                        raw_okey = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or config.get("openai_key")
+                        okey = self.sanitize_key(raw_okey)
+                        if okey and self._init_openai(okey):
+                            print(f"[AI Fallback] Chuyển đổi thành công sang OpenAI model {self.model_name}.")
+                        else:
+                            raise gem_err
+
+                # C. FALLBACK SANG OPENAI (Nếu Gemini ban đầu bị lỗi)
+                if self.provider == "openai" and not reply_text:
+                    if image_target:
+                        image_bytes = await image_target.read()
+                        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+                        mime_type = image_target.content_type or "image/jpeg"
+
+                        safety_prompt_prefix = (
+                            "Bạn là hệ thống kiểm duyệt hình ảnh và bản quyền an toàn thông minh của Discord Bot (AI Vision).\n"
+                            "Nếu phát hiện vi phạm NSFW, máu me, tự hại hoặc logo bản quyền lớn, bắt đầu bằng: "
+                            "\"CẢNH BÁO AN TOÀN: Hình ảnh chứa nội dung nhạy cảm hoặc vi phạm bản quyền và đã bị chặn bởi hệ thống AI Vision.\"\n"
+                            "Nếu an toàn, trả lời bình thường bằng tiếng Việt."
+                        )
+                        prompt_text = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này.'}"
+
+                        messages = [
+                            {"role": "system", "content": system_prompt},
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt_text},
+                                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
+                                ]
+                            }
+                        ]
+
+                        models_to_try = [self.model_name, "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+                        last_ex = None
+                        response = None
+                        for m in dict.fromkeys(models_to_try):
+                            try:
+                                response = await self.bot.loop.run_in_executor(
+                                    None,
+                                    lambda m_curr=m: self.openai_client.chat.completions.create(
+                                        model=m_curr,
+                                        messages=messages
+                                    )
+                                )
+                                self.model_name = m
+                                break
+                            except Exception as m_err:
+                                last_ex = m_err
+                                continue
+                        if response and hasattr(response, "choices"):
+                            reply_text = response.choices[0].message.content
+                        else:
+                            raise last_ex
+                    else:
+                        messages = self._get_openai_messages(guild_id, user_id, system_prompt, prompt_with_rag)
+                        models_to_try = [self.model_name, "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+                        last_ex = None
+                        response = None
+                        for m in dict.fromkeys(models_to_try):
+                            try:
+                                response = await self.bot.loop.run_in_executor(
+                                    None,
+                                    lambda m_curr=m: self.openai_client.chat.completions.create(
+                                        model=m_curr,
+                                        messages=messages
+                                    )
+                                )
+                                self.model_name = m
+                                break
+                            except Exception as m_err:
+                                last_ex = m_err
+                                continue
+                        if response and hasattr(response, "choices"):
+                            reply_text = response.choices[0].message.content
+                        else:
+                            raise last_ex
+
+                    if response and getattr(response, "usage", None):
+                        prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
+                        completion_tokens = getattr(response.usage, "completion_tokens", 0)
+                        total_tokens = getattr(response.usage, "total_tokens", 0)
 
                 latency_ms = int((time.time() - start_time) * 1000)
 
