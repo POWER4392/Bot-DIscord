@@ -457,6 +457,73 @@ class AIChatbot(commands.Cog):
             ephemeral=True
         )
 
+    def _build_live_server_context(self, guild: discord.Guild, author: discord.User, content: str, reply_target=None) -> str:
+        if not guild:
+            return f"[THÔNG TIN NGƯỜI DÙNG]: {author.display_name} (ID: {author.id})."
+
+        total_members = guild.member_count or len(guild.members)
+        bots_count = sum(1 for m in guild.members if m.bot)
+        humans_count = total_members - bots_count
+        owner_name = guild.owner.display_name if guild.owner else "Chưa rõ"
+
+        ctx_lines = [
+            f"[THÔNG TIN THỜI GIAN THỰC CỦA SERVER DISCORD HIỆN TẠI]",
+            f"- Tên Server: {guild.name}",
+            f"- Chủ Server (Owner): {owner_name}",
+            f"- Tổng số thành viên: {total_members} người ({humans_count} người thật, {bots_count} bot)",
+            f"- Số kênh: {len(guild.channels)} | Số vai trò (roles): {len(guild.roles)}",
+            f"- Người đặt câu hỏi: {author.display_name} (ID: {author.id})"
+        ]
+
+        target_members = []
+        if reply_target and hasattr(reply_target, "mentions") and reply_target.mentions:
+            for m in reply_target.mentions:
+                if not m.bot and m not in target_members:
+                    target_members.append(m)
+
+        content_lower = content.lower()
+        if any(kw in content_lower for kw in ["ai là", "thông tin", "người này", "thằng", "bạn", "profile", "member", "level", "tiền", "ai", "xem"]):
+            for m in guild.members:
+                if not m.bot and len(target_members) < 5:
+                    if m.name.lower() in content_lower or m.display_name.lower() in content_lower or str(m.id) in content:
+                        if m not in target_members:
+                            target_members.append(m)
+
+        if target_members:
+            ctx_lines.append("\n[THÔNG TIN CHI TIẾT VỀ THÀNH VIÊN ĐƯỢC HỎI / Đề CẬP]")
+            for tm in target_members:
+                roles = [r.name for r in tm.roles if r.name != "@everyone"]
+                roles_str = ", ".join(roles) if roles else "Không có"
+                joined_str = tm.joined_at.strftime("%d/%m/%Y") if tm.joined_at else "Không rõ"
+                
+                lvl_str = "1"
+                bal_str = "0"
+                warn_str = "0"
+                try:
+                    with db_lock:
+                        cursor.execute("SELECT level FROM user_levels WHERE guild_id=? AND user_id=?", (str(guild.id), str(tm.id)))
+                        r_lvl = cursor.fetchone()
+                        if r_lvl: lvl_str = str(r_lvl[0])
+
+                        cursor.execute("SELECT balance FROM user_profiles WHERE guild_id=? AND user_id=?", (str(guild.id), str(tm.id)))
+                        r_bal = cursor.fetchone()
+                        if r_bal: bal_str = str(r_bal[0])
+
+                        cursor.execute("SELECT warn_count FROM warnings WHERE guild_id=? AND user_id=?", (str(guild.id), str(tm.id)))
+                        r_warn = cursor.fetchone()
+                        if r_warn: warn_str = str(r_warn[0])
+                except Exception as ex:
+                    print(f"[AI Context DB Error] {ex}")
+
+                ctx_lines.append(
+                    f"• {tm.display_name} (@{tm.name} | ID: {tm.id}):\n"
+                    f"  - Tham gia server: {joined_str}\n"
+                    f"  - Danh sách Vai trò (Roles): {roles_str}\n"
+                    f"  - Cấp độ (Level): {lvl_str} | Số dư xu: {bal_str} xu | Số lần bị cảnh báo (Warns): {warn_str}"
+                )
+
+        return "\n".join(ctx_lines)
+
     # ------------------------------------------------------------------
     # Core chat logic
     # ------------------------------------------------------------------
@@ -471,10 +538,13 @@ class AIChatbot(commands.Cog):
         attachment: discord.Attachment = None
     ):
         from core.shared import config
-        system_prompt = config.get(
+        base_prompt = config.get(
             "ai_system_prompt",
             "Bạn là một trợ lý ảo Discord thân thiện, nhiệt tình, hỗ trợ thành viên server."
         )
+
+        live_server_info = self._build_live_server_context(guild, author, content, reply_target=reply_target)
+        system_prompt = f"{base_prompt}\n\n{live_server_info}"
 
         guild_id = guild.id if guild else 0
         user_id = author.id
