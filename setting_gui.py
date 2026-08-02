@@ -707,7 +707,7 @@ entry_api_port = mki(fc_secret, "🔌  LOCAL API PORT (Webserver):", "api_port",
 ctk.CTkFrame(fc_secret, fg_color="transparent", height=4).pack()
 
 
-# — 1.5. CẤU HÌNH API AI CHUYÊN BIỆT (CHATGPT / OPENAI & GOOGLE GEMINI) —
+# — 1.5. CẤU HÌNH API AI CHUYÊN BIỆT (CHATGPT & GOOGLE GEMINI) —
 fc_ai_config = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
                             border_width=1, border_color="#5865F2")
 fc_ai_config.pack(fill="x", padx=5, pady=(4, 6))
@@ -720,7 +720,6 @@ ctk.CTkLabel(_ai_h, text="⚡ Đồng bộ ngay khi lưu (Local & Cloud)",
              font=("Segoe UI", 10), text_color="#57F287").pack(side="left", padx=(10, 0))
 
 entry_openai_key   = make_secret_field(fc_ai_config, "🧠  CHATGPT (OPENAI) API KEY:", "openai_api_key")
-entry_openai_model = mki(fc_ai_config, "🤖  OPENAI MODEL (gpt-4o-mini / gpt-4o):", "openai_model", "gpt-4o-mini")
 entry_gemini_key   = make_secret_field(fc_ai_config, "💎  GOOGLE GEMINI API KEY:", "gemini_api_key")
 entry_ai_channel   = mki(fc_ai_config, "📺  AI CHAT CHANNEL ID:", "ai_channel_id", "")
 entry_ai_prompt    = mki(fc_ai_config, "💬  AI SYSTEM PROMPT:", "ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
@@ -730,13 +729,11 @@ def save_ai_config_action():
         try:
             okey = entry_openai_key.get().strip()
             gkey = entry_gemini_key.get().strip()
-            mname = entry_openai_model.get().strip() or "gpt-4o-mini"
             chid = entry_ai_channel.get().strip()
             prompt = entry_ai_prompt.get().strip()
 
             cfg["openai_api_key"] = okey
             cfg["gemini_api_key"] = gkey
-            cfg["openai_model"] = mname
             cfg["ai_channel_id"] = chid
             cfg["ai_system_prompt"] = prompt
             if okey and not gkey:
@@ -758,7 +755,6 @@ def save_ai_config_action():
             payload = {
                 "openai_api_key": okey,
                 "gemini_api_key": gkey,
-                "openai_model": mname,
                 "ai_channel_id": chid,
                 "ai_system_prompt": prompt,
                 "ai_provider": cfg.get("ai_provider", "openai")
