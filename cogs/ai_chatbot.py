@@ -91,10 +91,9 @@ class AIChatbot(commands.Cog):
 
     def _init_gemini(self, key: str) -> bool:
         models_to_try = [
-            "gemini-2.5-flash",
             "gemini-2.0-flash",
-            "gemini-1.5-flash",
             "gemini-2.0-flash-lite",
+            "gemini-1.5-flash",
             "gemini-flash-latest"
         ]
         for m_name in models_to_try:
