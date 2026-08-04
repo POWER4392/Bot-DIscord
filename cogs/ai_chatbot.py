@@ -182,7 +182,8 @@ class AIChatbot(commands.Cog):
                 rows = cursor.fetchall()
             history = []
             for role, content in rows:
-                history.append({"role": role, "parts": [content]})
+                g_role = "user" if role == "user" else "model"
+                history.append(types.Content(role=g_role, parts=[types.Part.from_text(text=str(content))]))
             return history
         except Exception as e:
             print(f"[AI DB] Loi doc lich su: {e}")
@@ -667,7 +668,7 @@ class AIChatbot(commands.Cog):
                 # B. XỬ LÝ VỚI GOOGLE GEMINI (Nếu Gemini là ưu tiên HOẶC nếu OpenAI bị lỗi)
                 if self.provider == "gemini" and not reply_text:
                     try:
-                        models_to_try = [self.model_name, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-flash-latest"]
+                        models_to_try = [self.model_name, "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-flash-latest"]
                         last_g_ex = None
                         response = None
 
