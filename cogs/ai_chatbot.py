@@ -407,6 +407,29 @@ class AIChatbot(commands.Cog):
         await ctx.send(f"⚙️ **Đã chuyển đổi mô hình AI:** Provider = `{self.provider}`, Model = `{self.model_name}`.")
 
     # ------------------------------------------------------------------
+    # Hybrid Command: !sethistory <on/off>
+    # ------------------------------------------------------------------
+    @commands.hybrid_command(name="sethistory", description="Bật/Tắt lưu lịch sử hội thoại AI (Tắt để gửi trực tiếp tiết kiệm token).")
+    async def sethistory_cmd(self, ctx: commands.Context, status: str):
+        from core.shared import config, config_file
+        status_clean = status.strip().lower()
+        if status_clean in ("off", "tat", "tắt", "false", "0", "direct", "trực tiếp"):
+            config["ai_enable_history"] = False
+            msg = "⚡ **Đã TẮT lưu lịch sử (Chế độ Gửi Trực Tiếp).** Bot sẽ gửi câu hỏi độc lập trực tiếp cho AI, tiết kiệm tối đa Token và phản hồi nhanh nhất!"
+        else:
+            config["ai_enable_history"] = True
+            msg = "💬 **Đã BẬT lưu lịch sử hội thoại.** Bot sẽ nhớ các tin nhắn trước đó của bạn."
+
+        self.chat_sessions.clear()
+        try:
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"[SetHistory Error] {e}")
+
+        await ctx.send(msg)
+
+    # ------------------------------------------------------------------
     # Hybrid Command: !ai <question>
     # ------------------------------------------------------------------
     @commands.hybrid_command(name="ai", description="Hỏi AI Chatbot câu hỏi của bạn (OpenAI / Gemini).")
@@ -628,8 +651,15 @@ class AIChatbot(commands.Cog):
                             if not response:
                                 raise last_ex
                         else:
-                            self._save_message_to_db(guild_id, user_id, "user", content)
-                            messages = self._get_openai_messages(guild_id, user_id, system_prompt, prompt_with_rag)
+                            use_history = config.get("ai_enable_history", True)
+                            if use_history:
+                                self._save_message_to_db(guild_id, user_id, "user", content)
+                                messages = self._get_openai_messages(guild_id, user_id, system_prompt, prompt_with_rag)
+                            else:
+                                messages = [
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": prompt_with_rag}
+                                ]
 
                             models_to_try = [self.model_name, "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
                             last_ex = None
@@ -683,7 +713,8 @@ class AIChatbot(commands.Cog):
                             )
                             prompt = f"{safety_prompt_prefix}\n{prompt_with_rag if content else 'Hãy phân tích hình ảnh này.'}"
 
-                            self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
+                            if config.get("ai_enable_history", True):
+                                self._save_message_to_db(guild_id, user_id, "user", f"[Gửi ảnh] {content or ''}")
 
                             for m in dict.fromkeys(models_to_try):
                                 try:
@@ -701,17 +732,22 @@ class AIChatbot(commands.Cog):
                             else:
                                 raise last_g_ex
                         else:
-                            self._save_message_to_db(guild_id, user_id, "user", content)
-                            try:
-                                session = self._get_gemini_session(guild_id, user_id, system_prompt)
-                                response = await self.bot.loop.run_in_executor(
-                                    None,
-                                    lambda: session.send_message(prompt_with_rag)
-                                )
-                                reply_text = response.text
-                            except Exception as ex:
-                                print(f"[AI Session Warning] Lỗi Gemini session chat ({ex}), thử generate_content...")
-                                self.chat_sessions.pop((guild_id, user_id), None)
+                            use_hist = config.get("ai_enable_history", True)
+                            if use_hist:
+                                self._save_message_to_db(guild_id, user_id, "user", content)
+                                try:
+                                    session = self._get_gemini_session(guild_id, user_id, system_prompt)
+                                    response = await self.bot.loop.run_in_executor(
+                                        None,
+                                        lambda: session.send_message(prompt_with_rag)
+                                    )
+                                    reply_text = response.text
+                                except Exception as ex:
+                                    print(f"[AI Session Warning] Lỗi Gemini session chat ({ex}), thử generate_content...")
+                                    self.chat_sessions.pop((guild_id, user_id), None)
+                                    use_hist = False
+
+                            if not use_hist or not reply_text:
                                 for m in dict.fromkeys(models_to_try):
                                     try:
                                         response = await self.bot.loop.run_in_executor(
@@ -823,7 +859,8 @@ class AIChatbot(commands.Cog):
                 latency_ms = int((time.time() - start_time) * 1000)
 
                 self._save_token_usage_to_db(guild_id, user_id, prompt_tokens, completion_tokens, total_tokens, latency_ms)
-                self._save_message_to_db(guild_id, user_id, "assistant" if self.provider == "openai" else "model", reply_text)
+                if config.get("ai_enable_history", True):
+                    self._save_message_to_db(guild_id, user_id, "assistant" if self.provider == "openai" else "model", reply_text)
 
                 if len(reply_text) > 1990:
                     reply_text = reply_text[:1990] + "..."
