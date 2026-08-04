@@ -721,21 +721,17 @@ ctk.CTkLabel(_ai_h, text="⚡ Đồng bộ ngay khi lưu (Local & Cloud)",
 
 entry_openai_key   = make_secret_field(fc_ai_config, "🧠  CHATGPT (OPENAI) API KEY:", "openai_api_key")
 entry_gemini_key   = make_secret_field(fc_ai_config, "💎  GOOGLE GEMINI API KEY:", "gemini_api_key")
-entry_ai_channel   = mki(fc_ai_config, "📺  AI CHAT CHANNEL ID:", "ai_channel_id", "")
-entry_ai_prompt    = mki(fc_ai_config, "💬  AI SYSTEM PROMPT:", "ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
 
 def save_ai_config_action():
     def _bg_ai():
         try:
             okey = entry_openai_key.get().strip()
             gkey = entry_gemini_key.get().strip()
-            chid = entry_ai_channel.get().strip()
-            prompt = entry_ai_prompt.get().strip()
+            chid = cfg.get("ai_channel_id", "")
+            prompt = cfg.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
 
             cfg["openai_api_key"] = okey
             cfg["gemini_api_key"] = gkey
-            cfg["ai_channel_id"] = chid
-            cfg["ai_system_prompt"] = prompt
             if okey and not gkey:
                 cfg["ai_provider"] = "openai"
             elif gkey and not okey:
