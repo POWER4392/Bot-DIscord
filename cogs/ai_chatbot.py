@@ -111,10 +111,17 @@ class AIChatbot(commands.Cog):
             "gemini-1.5-flash",
             "gemini-flash-latest"
         ]
+        http_opts = types.HttpOptions(
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                "X-Client-OS": "Windows",
+                "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+        )
         for m_name in models_to_try:
             try:
                 self.model_name = m_name
-                self.gemini_client = genai.Client(api_key=key)
+                self.gemini_client = genai.Client(api_key=key, http_options=http_opts)
                 self.provider = "gemini"
                 print(f"[AI] Gemini API nạp thành công với model {self.model_name}.")
                 return True

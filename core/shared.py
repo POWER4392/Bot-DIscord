@@ -106,6 +106,13 @@ if _yt_proxy:
 else:
     print("[Music] ℹ️ Không có YT_PROXY — nếu bị lỗi bot detection, thêm env var YT_PROXY vào Render")
 
+# Nếu có proxy cho AI (AI_PROXY hoặc HTTPS_PROXY) thì nạp vào môi trường hệ thống để lách IP Data Center
+_ai_proxy = os.environ.get('AI_PROXY', '').strip() or os.environ.get('HTTPS_PROXY', '').strip()
+if _ai_proxy:
+    os.environ['HTTP_PROXY'] = _ai_proxy
+    os.environ['HTTPS_PROXY'] = _ai_proxy
+    print(f"[AI] 🌐 Đã bật AI Proxy: {_ai_proxy[:30]}...")
+
 # Tìm cookies.txt theo thứ tự ưu tiên (hỗ trợ cả local Windows và Render cloud)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COOKIES_CANDIDATES = [
