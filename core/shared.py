@@ -28,6 +28,8 @@ DEFAULT_CONFIG_DEFAULTS = {
     "api_port": 8080,
     "openai_model": "gpt-4o-mini",
     "ai_provider": "gemini",
+    "gemini_api_key": "AQ.Ab8RN6Kc2IjYM6p3pjijqhV6naVcnbvh7UEm97AXTJC6l783pQ",
+    "openai_api_key": "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",
     "ai_system_prompt": "Bạn là một trợ lý ảo Discord thân thiện.",
     "cmd_play": "play",
     "cmd_stop": "stop",

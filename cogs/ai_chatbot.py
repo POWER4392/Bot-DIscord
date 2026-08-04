@@ -67,8 +67,8 @@ class AIChatbot(commands.Cog):
 
     def ensure_model_initialized(self) -> bool:
         from core.shared import config
-        raw_okey = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or config.get("openai_key")
-        raw_gkey = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+        raw_okey = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or config.get("openai_key") or "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"
+        raw_gkey = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or "AQ.Ab8RN6Kc2IjYM6p3pjijqhV6naVcnbvh7UEm97AXTJC6l783pQ"
 
         okey = self.sanitize_key(raw_okey)
         gkey = self.sanitize_key(raw_gkey)
@@ -719,7 +719,7 @@ class AIChatbot(commands.Cog):
                             total_tokens = getattr(response.usage, "total_tokens", 0)
                     except Exception as oai_err:
                         print(f"[AI Warning] Lỗi OpenAI ({oai_err}). Thử chuyển sang Gemini AI...")
-                        raw_gkey = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key")
+                        raw_gkey = os.getenv("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or "AQ.Ab8RN6Kc2IjYM6p3pjijqhV6naVcnbvh7UEm97AXTJC6l783pQ"
                         gkey = self.sanitize_key(raw_gkey)
                         if gkey and self._init_gemini(gkey):
                             print(f"[AI Fallback] Chuyển đổi thành công sang Gemini model {self.model_name}.")
@@ -802,7 +802,7 @@ class AIChatbot(commands.Cog):
                             total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
                     except Exception as gem_err:
                         print(f"[AI Warning] Lỗi Gemini ({gem_err}). Thử chuyển sang OpenAI...")
-                        raw_okey = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or config.get("openai_key")
+                        raw_okey = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or config.get("openai_key") or "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"
                         okey = self.sanitize_key(raw_okey)
                         if okey and self._init_openai(okey):
                             print(f"[AI Fallback] Chuyển đổi thành công sang OpenAI model {self.model_name}.")
