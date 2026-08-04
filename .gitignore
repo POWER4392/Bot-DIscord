@@ -28,3 +28,5 @@ gui_settings.json
 # Cấu hình IDE / Build
 .vscode/
 dist/
+scratch/
+

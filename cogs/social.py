@@ -3,9 +3,8 @@ from discord.ext import commands, tasks
 import re
 import requests
 import xml.etree.ElementTree as ET
-from core.shared import config, PLATFORM_EMOJI, is_mod
+from core.shared import PLATFORM_EMOJI, is_mod
 from core.database import cursor, conn, db_lock
-import json
 
 class DoiLinkView(discord.ui.View):
     def __init__(self, platform, link):

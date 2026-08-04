@@ -23,6 +23,34 @@ try:
 except Exception as e:
     print(f"❌ Lỗi đọc file {config_file}: {e}")
 
+DEFAULT_CONFIG_DEFAULTS = {
+    "prefix": "!",
+    "api_port": 8080,
+    "openai_model": "gpt-4o-mini",
+    "ai_provider": "openai",
+    "ai_system_prompt": "Bạn là một trợ lý ảo Discord thân thiện.",
+    "cmd_play": "play",
+    "cmd_stop": "stop",
+    "cmd_skip": "skip",
+    "cmd_pause": "pause",
+    "cmd_resume": "resume",
+    "cmd_ping": "ping",
+    "cmd_kick": "kick",
+    "cmd_ban": "ban",
+    "cmd_mute": "mute",
+    "cmd_clear": "clear",
+    "cmd_addword": "addword",
+    "cmd_delword": "delword",
+    "cmd_warn": "warn",
+    "cmd_timed_role": "timed_role",
+    "cmd_profile": "profile",
+    "cmd_setup_voice": "setup_voice",
+    "cmd_ticket_setup": "ticket_setup"
+}
+for d_key, d_val in DEFAULT_CONFIG_DEFAULTS.items():
+    if d_key not in config:
+        config[d_key] = d_val
+
 # Nạp đè/bổ sung cấu hình nhạy cảm từ biến môi trường để tăng tính bảo mật
 if os.environ.get("DISCORD_TOKEN"):
     config["token"] = os.environ.get("DISCORD_TOKEN")
@@ -33,6 +61,11 @@ if os.environ.get("GEMINI_API_KEY"):
     if (raw_gkey.startswith('"') and raw_gkey.endswith('"')) or (raw_gkey.startswith("'") and raw_gkey.endswith("'")):
         raw_gkey = raw_gkey[1:-1].strip()
     config["gemini_api_key"] = raw_gkey
+if os.environ.get("OPENAI_API_KEY"):
+    raw_okey = str(os.environ.get("OPENAI_API_KEY")).strip()
+    if (raw_okey.startswith('"') and raw_okey.endswith('"')) or (raw_okey.startswith("'") and raw_okey.endswith("'")):
+        raw_okey = raw_okey[1:-1].strip()
+    config["openai_api_key"] = raw_okey
 
 # Database Lock
 db_lock = threading.Lock()

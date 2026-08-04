@@ -14,7 +14,7 @@ import datetime
 import os
 
 try:
-    from core.shared import config, api_server_started
+    from core.shared import config
     from core.database import cursor, conn, db_lock
     from core.api_server import start_api_server
     # Import Views for Persistent adding
@@ -139,8 +139,14 @@ async def check_gui_tasks():
                 roles_data = data.get("roles")
                 
                 guild = bot.get_guild(int(guild_id))
+                if not guild:
+                    try: guild = await bot.fetch_guild(int(guild_id))
+                    except: pass
                 if guild:
                     channel = guild.get_channel(int(channel_id))
+                    if not channel:
+                        try: channel = await bot.fetch_channel(int(channel_id))
+                        except: pass
                     if channel:
                         panel_desc = data.get("desc", "Nhấn vào các nút bên dưới để tự cấp / gỡ vai trò cho bản thân.")
                         embed = discord.Embed(

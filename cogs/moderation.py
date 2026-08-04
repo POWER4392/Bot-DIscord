@@ -1,11 +1,8 @@
 import discord
 from discord.ext import commands
-import os
-import json
 import datetime
 import time
 import asyncio
-import re
 from core.shared import config, anti_nuke_tracker, spam_tracker, SCAM_REGEX_GLOBAL, is_mod
 from core.database import cursor, conn, db_lock
 

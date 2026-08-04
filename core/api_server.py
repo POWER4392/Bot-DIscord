@@ -155,20 +155,34 @@ def create_handle_api(bot):
                 from core.shared import update_bot_command_names
                 update_bot_command_names(bot)
                 
+                o_key = config.get("openai_api_key") or config.get("openai_key")
+                if o_key:
+                    os.environ["OPENAI_API_KEY"] = str(o_key).strip()
                 g_key = config.get("gemini_api_key") or config.get("gemini_key")
                 if g_key:
                     os.environ["GEMINI_API_KEY"] = str(g_key).strip()
-                    ai_cog = bot.cogs.get("AIChatbot")
-                    if ai_cog:
-                        ai_cog.model = None
-                        ai_cog.ensure_model_initialized()
                 
+                ai_cog = bot.cogs.get("AIChatbot")
+                if ai_cog:
+                    ai_cog.openai_client = None
+                    ai_cog.gemini_client = None
+                    ai_cog.ensure_model_initialized()
+
                 return web.json_response({"ok": True, "msg": "Config updated"})
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
 
         elif action == "GET_SERVER_DATA":
             import core.shared as shared
+            if bot and bot.guilds:
+                server_data = {}
+                for guild in bot.guilds:
+                    roles = [{"id": str(r.id), "name": r.name} for r in guild.roles if r.name != "@everyone"]
+                    channels = [{"id": str(c.id), "name": c.name} for c in guild.text_channels]
+                    categories = [{"id": str(c.id), "name": c.name} for c in guild.categories]
+                    server_data[str(guild.id)] = {"name": guild.name, "roles": roles, "channels": channels, "categories": categories}
+                shared.server_data = server_data
+
             return web.json_response({"ok": True, "data": shared.server_data})
 
         elif action == "GET_DASHBOARD_STATS":
@@ -184,11 +198,16 @@ def create_handle_api(bot):
             })
 
         elif action == "GET_AI_STATUS":
+            openai_key = os.environ.get("OPENAI_API_KEY") or config.get("openai_api_key") or ""
             gemini_key = os.environ.get("GEMINI_API_KEY") or config.get("gemini_api_key") or config.get("gemini_key") or ""
             return web.json_response({
                 "ok": True,
+                "openai_api_configured": openai_key != "",
+                "openai_api_key": openai_key,
                 "gemini_api_configured": gemini_key != "",
                 "gemini_api_key": gemini_key,
+                "ai_provider": config.get("ai_provider", "openai"),
+                "openai_model": config.get("openai_model", "gpt-4o-mini"),
                 "ai_channel_id": config.get("ai_channel_id", ""),
                 "ai_system_prompt": config.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
             })
@@ -201,25 +220,37 @@ def create_handle_api(bot):
                 payload = data.get("payload", {})
                 config["ai_channel_id"] = payload.get("ai_channel_id", config.get("ai_channel_id", ""))
                 config["ai_system_prompt"] = payload.get("ai_system_prompt", config.get("ai_system_prompt", ""))
+                if "ai_provider" in payload:
+                    config["ai_provider"] = payload["ai_provider"]
+                if "openai_model" in payload:
+                    config["openai_model"] = payload["openai_model"]
                 
-                new_key = payload.get("gemini_api_key") or payload.get("gemini_key")
-                if new_key and str(new_key).strip():
-                    new_key = str(new_key).strip()
-                    config["gemini_api_key"] = new_key
-                    os.environ["GEMINI_API_KEY"] = new_key
-                    ai_cog = bot.cogs.get("AIChatbot")
-                    if ai_cog:
-                        ai_cog.api_key = new_key
-                        ai_cog.model = None
-                        success = ai_cog.ensure_model_initialized()
-                        if success:
-                            print(f"[API] Đã cập nhật động Gemini API Key thành công. (Model: {ai_cog.model_name})")
-                        else:
-                            print("[API Warning] Cập nhật Key nhưng không khởi tạo được mô hình AI.")
+                new_okey = payload.get("openai_api_key")
+                if new_okey and str(new_okey).strip():
+                    new_okey = str(new_okey).strip()
+                    config["openai_api_key"] = new_okey
+                    os.environ["OPENAI_API_KEY"] = new_okey
+
+                new_gkey = payload.get("gemini_api_key") or payload.get("gemini_key")
+                if new_gkey and str(new_gkey).strip():
+                    new_gkey = str(new_gkey).strip()
+                    config["gemini_api_key"] = new_gkey
+                    os.environ["GEMINI_API_KEY"] = new_gkey
+
+                ai_cog = bot.cogs.get("AIChatbot")
+                if ai_cog:
+                    ai_cog.openai_client = None
+                    ai_cog.gemini_client = None
+                    success = ai_cog.ensure_model_initialized()
+                    if success:
+                        print(f"[API] Cập nhật AI config thành công (Provider: {ai_cog.provider}, Model: {ai_cog.model_name}).")
+                    else:
+                        print("[API Warning] Cập nhật Key nhưng không khởi tạo được mô hình AI.")
 
                 with open(config_file, "w", encoding="utf-8") as f:
                     json.dump(config, f, indent=4, ensure_ascii=False)
-                return web.json_response({"ok": True, "msg": "Cấu hình AI đã được cập nhật thành công."})
+
+                return web.json_response({"ok": True, "msg": "AI Config updated"})
             except Exception as e:
                 return web.json_response({"ok": False, "error": str(e)})
 

@@ -453,11 +453,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const aiStatusRes = await fetchFromAPI("GET_AI_STATUS");
             aiSystemPrompt.value = aiStatusRes.ai_system_prompt || "";
             const aiApiKeyInput = document.getElementById("ai-api-key");
-            if (aiApiKeyInput && aiStatusRes.gemini_api_key) {
-                aiApiKeyInput.value = aiStatusRes.gemini_api_key;
+            if (aiApiKeyInput) {
+                aiApiKeyInput.value = aiStatusRes.openai_api_key || aiStatusRes.gemini_api_key || "";
             }
-            if (aiStatusRes.gemini_api_configured) {
-                aiApiStatusBadge.innerHTML = '<span class="status-badge online"><span class="dot"></span> Đã cấu hình API Key</span>';
+            if (aiStatusRes.openai_api_configured || aiStatusRes.gemini_api_configured) {
+                const providerName = aiStatusRes.openai_api_configured ? "OpenAI (ChatGPT)" : "Google Gemini";
+                aiApiStatusBadge.innerHTML = `<span class="status-badge online"><span class="dot"></span> Đã cấu hình API Key (${providerName})</span>`;
             } else {
                 aiApiStatusBadge.innerHTML = '<span class="status-badge offline"><span class="dot"></span> Chưa cấu hình API Key</span>';
             }
@@ -638,11 +639,18 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
 
         const aiApiKeyInput = document.getElementById("ai-api-key");
+        const keyVal = aiApiKeyInput ? aiApiKeyInput.value.trim() : "";
         const payload = {
             ai_channel_id: aiChannelSelect.value,
-            ai_system_prompt: aiSystemPrompt.value.trim(),
-            gemini_api_key: aiApiKeyInput ? aiApiKeyInput.value.trim() : ""
+            ai_system_prompt: aiSystemPrompt.value.trim()
         };
+        if (keyVal.startsWith("sk-")) {
+            payload.openai_api_key = keyVal;
+            payload.ai_provider = "openai";
+        } else if (keyVal) {
+            payload.gemini_api_key = keyVal;
+            payload.ai_provider = "gemini";
+        }
 
         if (isMockMode) {
             globalConfig.ai_channel_id = payload.ai_channel_id;

@@ -3,7 +3,7 @@ from discord.ext import commands
 import random
 import time
 from core.shared import config, level_cooldown
-from core.database import cursor, db_lock, db_get_user, db_update_xp, xp_for_level, level_for_xp
+from core.database import cursor, db_lock, db_get_user, db_update_xp, xp_for_level
 
 
 class Economy(commands.Cog):

@@ -1,12 +1,7 @@
 import discord
 from discord.ext import commands
-import asyncio
 import datetime
-import json
-import random
-import string
-from core.shared import config, config_file, is_mod
-from core.database import cursor, conn, db_lock
+from core.shared import config, is_mod
 
 
 # ─────────────────────────────────────────────
