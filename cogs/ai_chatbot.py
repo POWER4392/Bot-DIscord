@@ -131,13 +131,14 @@ class AIChatbot(commands.Cog):
         try:
             with db_lock:
                 cursor.execute(
-                    "SELECT role, content FROM ai_conversations WHERE guild_id=? AND user_id=? ORDER BY timestamp ASC LIMIT ?",
-                    (str(guild_id), str(user_id), MAX_HISTORY_PER_USER * 2)
+                    "SELECT role, content FROM ai_conversations WHERE guild_id=? AND user_id=? ORDER BY timestamp DESC LIMIT 6",
+                    (str(guild_id), str(user_id))
                 )
-                rows = cursor.fetchall()
+                rows = cursor.fetchall()[::-1]
             for role, content in rows:
                 o_role = "assistant" if role in ("model", "assistant") else "user"
-                messages.append({"role": o_role, "content": content})
+                c_text = str(content)[:500] if content else ""
+                messages.append({"role": o_role, "content": c_text})
         except Exception as e:
             print(f"[AI DB] Loi doc lich su cho OpenAI: {e}")
         
@@ -176,14 +177,15 @@ class AIChatbot(commands.Cog):
         try:
             with db_lock:
                 cursor.execute(
-                    "SELECT role, content FROM ai_conversations WHERE guild_id=? AND user_id=? ORDER BY timestamp ASC LIMIT ?",
-                    (str(guild_id), str(user_id), MAX_HISTORY_PER_USER * 2)
+                    "SELECT role, content FROM ai_conversations WHERE guild_id=? AND user_id=? ORDER BY timestamp DESC LIMIT 6",
+                    (str(guild_id), str(user_id))
                 )
-                rows = cursor.fetchall()
+                rows = cursor.fetchall()[::-1]
             history = []
             for role, content in rows:
                 g_role = "user" if role == "user" else "model"
-                history.append(types.Content(role=g_role, parts=[types.Part.from_text(text=str(content))]))
+                c_text = str(content)[:500] if content else ""
+                history.append(types.Content(role=g_role, parts=[types.Part.from_text(text=c_text)]))
             return history
         except Exception as e:
             print(f"[AI DB] Loi doc lich su: {e}")
