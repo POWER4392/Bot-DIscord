@@ -27,7 +27,7 @@ DEFAULT_CONFIG_DEFAULTS = {
     "prefix": "!",
     "api_port": 8080,
     "openai_model": "gpt-4o-mini",
-    "ai_provider": "openai",
+    "ai_provider": "gemini",
     "ai_system_prompt": "Bạn là một trợ lý ảo Discord thân thiện.",
     "cmd_play": "play",
     "cmd_stop": "stop",

@@ -11,6 +11,7 @@ import PIL.Image
 import io
 import base64
 import json
+import asyncio
 
 from core.database import cursor, conn, db_lock
 
@@ -22,8 +23,8 @@ class AIChatbot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         from core.shared import config
-        self.provider = "openai"  # "openai" hoặc "gemini"
-        self.model_name = "gpt-4o-mini"
+        self.provider = "gemini"  # Mặc định dùng Gemini AI
+        self.model_name = "gemini-2.0-flash"
         self.gemini_client = None
         self.openai_client = None
 
@@ -41,6 +42,20 @@ class AIChatbot(commands.Cog):
         self.max_duplicates = 3
 
         self.ensure_model_initialized()
+
+    async def _execute_with_retry(self, func, max_retries: int = 3):
+        for attempt in range(max_retries):
+            try:
+                res = await self.bot.loop.run_in_executor(None, func)
+                if res:
+                    return res
+            except Exception as ex:
+                err_str = str(ex).lower()
+                if ("429" in err_str or "resource_exhausted" in err_str or "quota" in err_str) and attempt < max_retries - 1:
+                    await asyncio.sleep(1.2 * (attempt + 1))
+                    continue
+                raise ex
+        return None
 
     def sanitize_key(self, key: str) -> str:
         if not key:
@@ -720,18 +735,17 @@ class AIChatbot(commands.Cog):
 
                             for m in dict.fromkeys(models_to_try):
                                 try:
-                                    response = await self.bot.loop.run_in_executor(
-                                        None,
+                                    response = await self._execute_with_retry(
                                         lambda m_curr=m: self.gemini_client.models.generate_content(model=m_curr, contents=[prompt, image_pil])
                                     )
-                                    self.model_name = m
-                                    break
+                                    if response and hasattr(response, "text"):
+                                        self.model_name = m
+                                        reply_text = response.text
+                                        break
                                 except Exception as m_err:
                                     last_g_ex = m_err
                                     continue
-                            if response and hasattr(response, "text"):
-                                reply_text = response.text
-                            else:
+                            if not reply_text:
                                 raise last_g_ex
                         else:
                             use_hist = config.get("ai_enable_history", True)
@@ -739,11 +753,11 @@ class AIChatbot(commands.Cog):
                                 self._save_message_to_db(guild_id, user_id, "user", content)
                                 try:
                                     session = self._get_gemini_session(guild_id, user_id, system_prompt)
-                                    response = await self.bot.loop.run_in_executor(
-                                        None,
+                                    response = await self._execute_with_retry(
                                         lambda: session.send_message(prompt_with_rag)
                                     )
-                                    reply_text = response.text
+                                    if response and hasattr(response, "text"):
+                                        reply_text = response.text
                                 except Exception as ex:
                                     print(f"[AI Session Warning] Lỗi Gemini session chat ({ex}), thử generate_content...")
                                     self.chat_sessions.pop((guild_id, user_id), None)
@@ -752,21 +766,20 @@ class AIChatbot(commands.Cog):
                             if not use_hist or not reply_text:
                                 for m in dict.fromkeys(models_to_try):
                                     try:
-                                        response = await self.bot.loop.run_in_executor(
-                                            None,
+                                        response = await self._execute_with_retry(
                                             lambda m_curr=m: self.gemini_client.models.generate_content(
                                                 model=m_curr,
                                                 contents=f"{system_prompt}\n\n{prompt_with_rag}"
                                             )
                                         )
-                                        self.model_name = m
-                                        break
+                                        if response and hasattr(response, "text"):
+                                            self.model_name = m
+                                            reply_text = response.text
+                                            break
                                     except Exception as m_err:
                                         last_g_ex = m_err
                                         continue
-                                if response and hasattr(response, "text"):
-                                    reply_text = response.text
-                                else:
+                                if not reply_text:
                                     raise (last_g_ex or ex)
 
                         if hasattr(response, "usage_metadata") and response.usage_metadata:
