@@ -111,10 +111,17 @@ class AIChatbot(commands.Cog):
             "gemini-1.5-flash",
             "gemini-flash-latest"
         ]
+        is_linux = os.name != "nt"
+        ua = (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            if is_linux
+            else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+        )
+        client_os = "Linux" if is_linux else "Windows"
         http_opts = types.HttpOptions(
             headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-                "X-Client-OS": "Windows",
+                "User-Agent": ua,
+                "X-Client-OS": client_os,
                 "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7"
             }
         )
