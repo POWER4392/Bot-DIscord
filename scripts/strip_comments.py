@@ -1,7 +1,6 @@
 import os
 import tokenize
 import io
-import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -10,36 +9,45 @@ SKIP_FILES = {"strip_comments.py"}
 
 
 def strip_comments_only(source: str) -> str:
-    result = []
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     except tokenize.TokenError:
         return source
 
-    prev_end = (1, 0)
+    lines = source.splitlines(keepends=True)
+
+    comment_lines = set()
+    inline_comment_cols = {}
 
     for tok in tokens:
         ttype, tstring, tstart, tend, tline = tok
-
         if ttype == tokenize.COMMENT:
-            pass
-        else:
-            srow, scol = tstart
-            erow_prev, ecol_prev = prev_end
-
-            if srow == erow_prev:
-                result.append(" " * max(0, scol - ecol_prev))
+            row, col = tstart
+            if tline[:col].strip() == "":
+                comment_lines.add(row)
             else:
-                result.append("\n" * (srow - erow_prev))
-                result.append(" " * scol)
+                inline_comment_cols[row] = col
 
-            result.append(tstring)
-            prev_end = tend
+    result = []
+    prev_blank = False
+    for i, line in enumerate(lines, start=1):
+        if i in comment_lines:
+            continue
 
-    output = "".join(result)
-    output = re.sub(r"[ \t]+\n", "\n", output)
-    output = re.sub(r"\n{3,}", "\n\n", output)
-    return output.rstrip() + "\n"
+        if i in inline_comment_cols:
+            col = inline_comment_cols[i]
+            line = line[:col].rstrip() + "\n"
+
+        is_blank = line.strip() == ""
+        if is_blank and prev_blank:
+            continue
+        prev_blank = is_blank
+        result.append(line)
+
+    out = "".join(result)
+    if out and not out.endswith("\n"):
+        out += "\n"
+    return out
 
 
 def process_project(root: str):
@@ -63,7 +71,7 @@ def process_project(root: str):
 
                 stripped = strip_comments_only(original)
 
-                if stripped.strip() != original.strip():
+                if stripped != original:
                     with open(fpath, "w", encoding="utf-8") as f:
                         f.write(stripped)
                     print(f"  [OK] {rel}")
