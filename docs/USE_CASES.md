@@ -7,7 +7,7 @@ Tài liệu này cung cấp cái nhìn tổng quan về các Use Case của hệ
 ## 1. Danh sách Tác nhân (Actors)
 - **Member (Thành viên):** Người dùng thông thường trong server, sử dụng các tiện ích của bot.
 - **Moderator / Admin (Quản trị viên):** Người có quyền quản lý, thiết lập bot và kiểm duyệt nội dung.
-- **System / Bot (Hệ thống):** Tiến trình xử lý tự động của bot chạy ngầm (AutoMod, Auto Tracker).
+- **System / Bot (Hệ thống):** Tiến trình xử lý tự động của bot chạy ngầm (SmartGuard, Auto Tracker).
 
 ---
 
@@ -15,12 +15,12 @@ Tài liệu này cung cấp cái nhìn tổng quan về các Use Case của hệ
 
 | ID | Tên Use Case | Tác nhân chính | Mô tả tóm tắt |
 |----|-------------|----------------|---------------|
-| **UC01** | Tự động kiểm duyệt (AutoMod) | System | Tự động quét tin nhắn phát hiện Phishing/Scam, Blacklist và spam. |
-| **UC02** | Bảo vệ Server (Anti-Nuke) | System | Tự động phát hiện và ngăn chặn hành vi xóa kênh/role hàng loạt. |
+| **UC01** | Tự động kiểm duyệt (SmartGuard) | System | Tự động quét tin nhắn phát hiện Phishing/Scam, Blacklist và spam. |
+| **UC02** | Bảo vệ Server (Chống Phá hoại Máy chủ) | System | Tự động phát hiện và ngăn chặn hành vi xóa kênh/role hàng loạt. |
 | **UC03** | Quản lý Thành viên | Admin | Sử dụng lệnh Kick, Ban, Mute, Unban, Warn xử lý vi phạm. |
 | **UC04** | Tạo và Quản lý Ticket | Member | Tạo kênh hỗ trợ riêng tư với Admin (Ticket). |
 | **UC05** | Tạo kênh Voice tạm thời | Member | Tương tác để tạo kênh thoại tạm thời (tự xóa khi trống). |
-| **UC06** | Tự cấp vai trò (Reaction Roles)| Member | Nhấn nút trên Panel để tự động nhận hoặc gỡ Role. |
+| **UC06** | Tự cấp vai trò (Giao diện Tự chọn Vai trò)| Member | Nhấn nút trên Panel để tự động nhận hoặc gỡ Role. |
 | **UC07** | Phát nhạc YouTube | Member | Yêu cầu Bot phát nhạc, dừng, chuyển bài hoặc xem hàng đợi. |
 | **UC08** | Hệ thống Kinh tế & Cấp độ | Member | Nhận XP, thăng cấp, nhận điểm danh hằng ngày. |
 | **UC09** | Theo dõi Mạng Xã Hội | System | Tự động lấy tin tức từ YouTube, TikTok, Reddit gửi vào kênh. |
@@ -48,11 +48,11 @@ usecaseDiagram
     admin --> (Cấu hình Bot GUI/Web)
     
     %% System Use Cases
-    bot --> (Tự động kiểm duyệt - AutoMod)
-    bot --> (Bảo vệ Server - Anti-Nuke)
+    bot --> (Tự động kiểm duyệt - SmartGuard)
+    bot --> (Bảo vệ Server - Chống Phá hoại Máy chủ)
 
     %% Relationships
-    (Quản lý Thành viên) .> (Tự động kiểm duyệt - AutoMod) : include
+    (Quản lý Thành viên) .> (Tự động kiểm duyệt - SmartGuard) : include
 ```
 
 ---
@@ -61,13 +61,13 @@ usecaseDiagram
 
 Dưới đây là đặc tả cho các chức năng cốt lõi nhất của hệ thống.
 
-### 4.1. Đặc tả UC01: Tự động kiểm duyệt (AutoMod)
+### 4.1. Đặc tả UC01: Tự động kiểm duyệt (SmartGuard)
 | Thuộc tính | Chi tiết |
 |------------|----------|
-| **Tên Use Case** | Tự động kiểm duyệt (AutoMod) |
+| **Tên Use Case** | Tự động kiểm duyệt (SmartGuard) |
 | **Tác nhân** | System (Hệ thống) |
 | **Mô tả** | Hệ thống tự động phân tích mọi tin nhắn gửi lên Server để phát hiện spam, từ khóa cấm (blacklist) hoặc link lừa đảo (phishing), sau đó xử lý vi phạm. |
-| **Tiền điều kiện** | Bot đã được cấp quyền "Manage Messages" và "Timeout Members". Module AutoMod đã được bật. |
+| **Tiền điều kiện** | Bot đã được cấp quyền "Manage Messages" và "Timeout Members". Module SmartGuard đã được bật. |
 | **Hậu điều kiện** | Tin nhắn vi phạm bị xóa. Người dùng vi phạm bị cảnh cáo hoặc bị Timeout/Ban tùy mức độ. |
 | **Luồng sự kiện chính** | 1. Member gửi một tin nhắn vào kênh chat.<br>2. System bắt sự kiện `on_message` và bỏ qua nếu là tin nhắn của Bot/Admin.<br>3. System kiểm tra tin nhắn bằng biểu thức chính quy (Regex) để tìm link Scam.<br>4. System kiểm tra từ khóa trong Blacklist.<br>5. System kiểm tra tần suất gửi tin nhắn (thuật toán Sliding Window Anti-spam).<br>6. Tin nhắn hợp lệ, System cho phép hiển thị bình thường. |
 | **Luồng ngoại lệ** | - **3a. Phát hiện link Scam:** System lập tức xóa tin nhắn, Timeout người dùng 1 giờ và ghi Log.<br>- **4a. Phát hiện từ khóa cấm:** System xóa tin nhắn, cảnh cáo (Warn) người dùng và ghi Log.<br>- **5a. Phát hiện Spam (>5 tin/3.5s):** System xóa các tin nhắn spam, Timeout người dùng 5 phút và ghi Log. |

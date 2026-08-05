@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Discord Bot Web Dashboard - Admin Portal | hendrix810</title>
-    <meta name="description" content="Bảng điều khiển quản trị Discord Bot — Giám sát, cấu hình AI Chatbot, Reaction Roles và kiểm thử bảo mật.">
+    <meta name="description" content="Bảng điều khiển quản trị Discord Bot — Giám sát, cấu hình AI Chatbot, Giao diện Tự chọn Vai trò và kiểm thử bảo mật.">
     <meta name="author" content="Tống Xuân Nghĩa (@hendrix810) — Issue #31: UI/UX Web Dashboard">
     <!-- Google Fonts: Outfit & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,7 +39,7 @@
                 </a>
                 <a href="#reaction-roles" class="nav-item" data-tab="reaction-roles">
                     <i data-lucide="tag"></i>
-                    <span>Reaction Roles</span>
+                    <span>Giao diện Tự chọn Vai trò</span>
                 </a>
                 <a href="#system-config" class="nav-item" data-tab="system-config">
                     <i data-lucide="settings"></i>
@@ -276,13 +276,13 @@
                 </div>
             </section>
 
-            <!-- SECTION 3: REACTION ROLES -->
+            <!-- SECTION 3: TỰ CHỌN VAI TRÒS -->
             <section id="tab-reaction-roles" class="tab-content">
                 <div class="card-glass card-panel">
                     <div class="panel-header">
                         <div class="panel-title">
                             <i data-lucide="tag"></i>
-                            <h3>Tạo Bảng Tự Chọn Vai Trò (Reaction Roles)</h3>
+                            <h3>Tạo Bảng Tự Chọn Vai Trò (Giao diện Tự chọn Vai trò)</h3>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -355,12 +355,12 @@
                     <div class="panel-header">
                         <div class="panel-title">
                             <i data-lucide="list"></i>
-                            <h3>Danh Sách Reaction Roles Đang Hoạt Động</h3>
+                            <h3>Danh Sách Giao diện Tự chọn Vai trò Đang Hoạt Động</h3>
                         </div>
                     </div>
                     <div class="panel-body">
                         <div id="rr-panels-list" class="rr-panels-list">
-                            <div class="badge-loading" style="padding: 20px; text-align: center;">Đang tải danh sách Reaction Roles...</div>
+                            <div class="badge-loading" style="padding: 20px; text-align: center;">Đang tải danh sách Giao diện Tự chọn Vai trò...</div>
                         </div>
                     </div>
                 </div>
@@ -565,7 +565,7 @@
                                 <div class="endpoint-method post">POST</div>
                                 <div class="endpoint-info">
                                     <code>/api → SPAWN_RR_PANEL</code>
-                                    <p>Tạo bảng Reaction Roles — Xếp hàng qua DB</p>
+                                    <p>Tạo bảng Giao diện Tự chọn Vai trò — Xếp hàng qua DB</p>
                                 </div>
                                 <span class="endpoint-badge auth">Auth</span>
                             </div>

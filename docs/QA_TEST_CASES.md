@@ -307,19 +307,19 @@
 
 ---
 
-### TC-UI-04: Reaction Role Builder — Thêm role
+### TC-UI-04: Tự chọn Vai trò Builder — Thêm role
 
 | Trường | Nội dung |
 |--------|----------|
 | **Test Case ID** | TC-UI-04 |
-| **Mô tả** | Thêm role vào Reaction Role Builder |
-| **Bước thực hiện** | Tab Reaction Roles → nhấn "Thêm Role" |
+| **Mô tả** | Thêm role vào Tự chọn Vai trò Builder |
+| **Bước thực hiện** | Tab Giao diện Tự chọn Vai trò → nhấn "Thêm Role" |
 | **Kết quả mong đợi** | Row mới xuất hiện với input fields |
 | **Kết quả thực tế** | ✅ PASS |
 
 ---
 
-### TC-UI-05: Reaction Role Builder — Giới hạn 5 role
+### TC-UI-05: Tự chọn Vai trò Builder — Giới hạn 5 role
 
 | Trường | Nội dung |
 |--------|----------|

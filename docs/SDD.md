@@ -170,7 +170,7 @@
 
 
 
-- **Hình 3.5.1:** Biểu đồ hoạt động (Activity Diagram) của luồng kiểm duyệt tự động AutoMod.
+- **Hình 3.5.1:** Biểu đồ hoạt động (Activity Diagram) của luồng kiểm duyệt tự động SmartGuard.
 
 
 
@@ -218,7 +218,7 @@
 
 
 
-- **Hình 4.2.4:** Biểu đồ tuần tự (Sequence Diagram) luồng kiểm duyệt tự động AutoMod (on_message → Scam → Spam → Blacklist).
+- **Hình 4.2.4:** Biểu đồ tuần tự (Sequence Diagram) luồng kiểm duyệt tự động SmartGuard (on_message → Scam → Spam → Blacklist).
 
 
 
@@ -354,7 +354,7 @@ Tài liệu này đặc tả chi tiết thiết kế hệ thống, cung cấp c�
 
 
 
-- **AutoMod:** Cơ chế lọc và xử lý nội dung vi phạm tự động mà không cần sự can thiệp của con người.
+- **SmartGuard:** Cơ chế lọc và xử lý nội dung vi phạm tự động mà không cần sự can thiệp của con người.
 
 
 
@@ -374,11 +374,11 @@ Tài liệu này đặc tả chi tiết thiết kế hệ thống, cung cấp c�
 
 
 
-- **Tự động kiểm duyệt (AutoMod):** Quét thời gian thực tất cả tin nhắn trên các kênh chat công cộng. Nếu phát hiện liên kết Phishing/Scam, từ cấm trong Blacklist, hoặc hành vi spam tin nhắn, hệ thống lập tức xóa tin nhắn đó, ghi nhận nhật ký (Log) và tự động áp dụng hình phạt cấm ngôn (Timeout) hoặc cấm tham gia (Ban) tùy mức độ vi phạm.
+- **Tự động kiểm duyệt (SmartGuard):** Quét thời gian thực tất cả tin nhắn trên các kênh chat công cộng. Nếu phát hiện liên kết Phishing/Scam, từ cấm trong Blacklist, hoặc hành vi spam tin nhắn, hệ thống lập tức xóa tin nhắn đó, ghi nhận nhật ký (Log) và tự động áp dụng hình phạt cấm ngôn (Timeout) hoặc cấm tham gia (Ban) tùy mức độ vi phạm.
 
 
 
-- **Chống phá hoại (Anti-Nuke):** Giám sát tần suất các hành động nhạy cảm như xóa kênh, xóa vai trò của các quản trị viên cấp dưới. Nếu một tài khoản thực hiện vượt quá 3 hành động trong vòng 30 giây, bot sẽ tự động thu hồi toàn bộ quyền hạn (Role) của tài khoản đó để bảo vệ server.
+- **Chống phá hoại (Chống Phá hoại Máy chủ):** Giám sát tần suất các hành động nhạy cảm như xóa kênh, xóa vai trò của các quản trị viên cấp dưới. Nếu một tài khoản thực hiện vượt quá 3 hành động trong vòng 30 giây, bot sẽ tự động thu hồi toàn bộ quyền hạn (Role) của tài khoản đó để bảo vệ server.
 
 
 
@@ -394,11 +394,11 @@ Tài liệu này đặc tả chi tiết thiết kế hệ thống, cung cấp c�
 
 
 
-- **Tạo kênh thoại tạm thời (Voice Generator):** Khi thành viên tham gia vào phòng chờ chỉ định, bot sẽ tự động tạo một phòng thoại mới cho thành viên đó và tự động xóa phòng thoại này đi khi không còn ai bên trong.
+- **Tạo kênh thoại tạm thời (Tự động Tạo Kênh Thoại (Dynamic Voice Channels)):** Khi thành viên tham gia vào phòng chờ chỉ định, bot sẽ tự động tạo một phòng thoại mới cho thành viên đó và tự động xóa phòng thoại này đi khi không còn ai bên trong.
 
 
 
-- **Tự nhận vai trò (Reaction Roles):** Cung cấp các panel có nút bấm tương tác (Button) giúp thành viên tự do chọn lựa hoặc gỡ bỏ các vai trò tùy thích (như thông báo, giới tính, khu vực) mà không cần liên hệ Admin.
+- **Tự nhận vai trò (Giao diện Tự chọn Vai trò):** Cung cấp các panel có nút bấm tương tác (Button) giúp thành viên tự do chọn lựa hoặc gỡ bỏ các vai trò tùy thích (như thông báo, giới tính, khu vực) mà không cần liên hệ Admin.
 
 
 
@@ -462,7 +462,7 @@ Tài liệu này đặc tả chi tiết thiết kế hệ thống, cung cấp c�
 
 
 
-- **Sliding Window Algorithm:** Áp dụng để phát hiện spam tin nhắn và theo dõi tần suất chống phá hoại (Anti-Nuke). Một danh sách các mốc thời gian (timestamps) của người dùng được lưu trữ và lọc liên tục trong một cửa sổ trượt (ví dụ: 3.5 giây đối với spam tin nhắn và 30 giây đối với Anti-Nuke) để đếm số lượng vi phạm.
+- **Sliding Window Algorithm:** Áp dụng để phát hiện spam tin nhắn và theo dõi tần suất chống phá hoại (Chống Phá hoại Máy chủ). Một danh sách các mốc thời gian (timestamps) của người dùng được lưu trữ và lọc liên tục trong một cửa sổ trượt (ví dụ: 3.5 giây đối với spam tin nhắn và 30 giây đối với Chống Phá hoại Máy chủ) để đếm số lượng vi phạm.
 
 
 
@@ -510,7 +510,7 @@ Tài liệu này đặc tả chi tiết thiết kế hệ thống, cung cấp c�
 
 
 
-   - Tạo các panel Reaction Role, panel Ticket.
+   - Tạo các panel Tự chọn Vai trò, panel Ticket.
 
 
 
@@ -722,7 +722,7 @@ Tài liệu này đặc tả chi tiết thiết kế hệ thống, cung cấp c�
 
 
 
-##### 2.3.2.1. Quy trình Kiểm duyệt Nội dung (AutoMod)
+##### 2.3.2.1. Quy trình Kiểm duyệt Nội dung (SmartGuard)
 
 
 
@@ -894,7 +894,7 @@ graph TD
 
 
 
-    user --> UC06(UC06: Tự cấp vai trò Reaction Roles)
+    user --> UC06(UC06: Tự cấp vai trò Giao diện Tự chọn Vai trò)
 
 
 
@@ -910,11 +910,11 @@ graph TD
 
 
 
-    bot --> UC01(UC01: Tự động kiểm duyệt - AutoMod)
+    bot --> UC01(UC01: Tự động kiểm duyệt - SmartGuard)
 
 
 
-    bot --> UC02(UC02: Bảo vệ Server - Anti-Nuke)
+    bot --> UC02(UC02: Bảo vệ Server - Chống Phá hoại Máy chủ)
 
 
 
@@ -942,7 +942,7 @@ Dưới đây là bảng đặc tả chi tiết của 5 ca sử dụng cốt lõ
 
 
 
-#### 3.4.1. Đặc tả UC01: Tự động kiểm duyệt (AutoMod)
+#### 3.4.1. Đặc tả UC01: Tự động kiểm duyệt (SmartGuard)
 
 
 
@@ -954,7 +954,7 @@ Dưới đây là bảng đặc tả chi tiết của 5 ca sử dụng cốt lõ
 
 
 
-| **Tên Use Case** | Tự động kiểm duyệt (AutoMod) |
+| **Tên Use Case** | Tự động kiểm duyệt (SmartGuard) |
 
 
 
@@ -966,7 +966,7 @@ Dưới đây là bảng đặc tả chi tiết của 5 ca sử dụng cốt lõ
 
 
 
-| **Tiền điều kiện** | Bot có quyền "Manage Messages", "Timeout Members". Module AutoMod được bật. |
+| **Tiền điều kiện** | Bot có quyền "Manage Messages", "Timeout Members". Module SmartGuard được bật. |
 
 
 
@@ -1154,7 +1154,7 @@ Các biểu đồ hoạt động dưới đây được chuẩn hóa theo địn
 
 
 
-#### 3.5.1. Luồng AutoMod (Kiểm duyệt tự động)
+#### 3.5.1. Luồng SmartGuard (Kiểm duyệt tự động)
 
 
 
@@ -1172,7 +1172,7 @@ flowchart TD
 
     
 
-    subgraph UC01[UC01: Luồng Kiểm Duyệt Tự Động AutoMod]
+    subgraph UC01[UC01: Luồng Kiểm Duyệt Tự Động SmartGuard]
 
         RecvMsg --> CheckAuthor{Tin nhắn từ<br>Bot hoặc Admin?}
 
@@ -1218,7 +1218,7 @@ flowchart TD
 
 
 
-![Biểu đồ hoạt động AutoMod](images/flowchart_automod.png)
+![Biểu đồ hoạt động SmartGuard](images/flowchart_smartguard.png)
 
 
 
@@ -1502,7 +1502,7 @@ stateDiagram-v2
 
 
 
-#### 3.5.5. Luồng Kênh thoại tạm thời (Voice Generator)
+#### 3.5.5. Luồng Kênh thoại tạm thời (Tự động Tạo Kênh Thoại (Dynamic Voice Channels))
 
 
 
@@ -1562,7 +1562,7 @@ stateDiagram-v2
 
 
 
-![Biểu đồ hoạt động Voice Generator](images/flowchart_voice.png)
+![Biểu đồ hoạt động Tự động Tạo Kênh Thoại (Dynamic Voice Channels)](images/flowchart_voice.png)
 
 
 
@@ -2123,7 +2123,7 @@ classDiagram
         class Moderation {
             <<cogs/moderation.py>>
             +blacklist_words : list
-            +nuke_tracker : dict
+            +protection_tracker : dict
             +on_message(message) None
             +on_guild_channel_delete(channel) None
             +kick(ctx, member, reason) None
@@ -2281,11 +2281,11 @@ classDiagram
 
 
 
-    - `Moderation`: Đảm nhận việc kiểm duyệt từ cấm (Blacklist), chống phá hoại (Anti-Nuke) và xử lý hình phạt.
+    - `Moderation`: Đảm nhận việc kiểm duyệt từ cấm (Blacklist), chống phá hoại (Chống Phá hoại Máy chủ) và xử lý hình phạt.
 
 
 
-    - `Utilities`: Tích hợp các công cụ tự phục vụ: hệ thống ticket, tạo phòng voice và reaction roles.
+    - `Utilities`: Tích hợp các công cụ tự phục vụ: hệ thống ticket, tạo phòng voice và tự chọn vai trò.
 
 
 
@@ -2567,7 +2567,7 @@ sequenceDiagram
 
 ![Biểu đồ tuần tự AI Chat](images/sequence_diagram_chat.png)
 
-##### 4.2.2.3. Luồng kiểm duyệt tự động AutoMod
+##### 4.2.2.3. Luồng kiểm duyệt tự động SmartGuard
 
 Biểu đồ tuần tự mô tả chi tiết luồng xử lý sự kiện `on_message` qua các bộ lọc và hành động phạt của Moderation Cog:
 
@@ -2617,7 +2617,7 @@ sequenceDiagram
     end
 ```
 
-![Biểu đồ tuần tự AutoMod](images/sequence_diagram_automod.png)
+![Biểu đồ tuần tự SmartGuard](images/sequence_diagram_smartguard.png)
 
 ##### 4.2.2.4. Luồng đàm thoại AI đầy đủ (AI Chat Full Flow)
 
@@ -2726,7 +2726,7 @@ Giao diện người dùng đầu cuối của bot trên Discord sử dụng c�
 
 
 
-- **Panel Tự chọn vai trò (Reaction Role Panel):**
+- **Panel Tự chọn vai trò (Tự chọn Vai trò Panel):**
 
 
 
@@ -2766,7 +2766,7 @@ Giao diện Web Dashboard dành cho Admin được xây dựng theo phong cách 
 
 
 
-  - Bật/tắt các module tính năng (AutoMod, Music, Economy) dạng công tắc Switch.
+  - Bật/tắt các module tính năng (SmartGuard, Music, Economy) dạng công tắc Switch.
 
 
 
@@ -2850,7 +2850,7 @@ Cơ sở dữ liệu của hệ thống lưu trữ toàn bộ thông tin hoạt 
 
 
 
-5. **reaction_panels:** Lưu cấu hình reaction role để khôi phục trạng thái.
+5. **reaction_panels:** Lưu cấu hình tự chọn vai trò để khôi phục trạng thái.
 
 
 

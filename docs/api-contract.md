@@ -136,7 +136,7 @@ X-API-Key: <secret>
 
 ---
 
-## 2.8 Reaction Roles — SPAWN_RR_PANEL
+## 2.8 Giao diện Tự chọn Vai trò — SPAWN_RR_PANEL
 
 ```json
 {

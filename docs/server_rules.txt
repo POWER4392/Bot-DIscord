@@ -6,10 +6,10 @@
 - **Không quảng cáo trái phép:** Không tự ý chia sẻ liên kết mời tham gia các server Discord khác hoặc quảng cáo sản phẩm khi chưa được sự cho phép của Ban quản trị.
 - **An toàn thông tin:** Không chia sẻ thông tin cá nhân của người khác, mã độc, phần mềm độc hại hoặc các đường link lừa đảo (phishing).
 
-## 2. HỆ THỐNG KIỂM DUYỆT TỰ ĐỘNG (AUTOMOD)
+## 2. HỆ THỐNG KIỂM DUYỆT TỰ ĐỘNG (SMARTGUARD)
 - **Bộ lọc từ cấm (Blacklist):** Hệ thống sẽ tự động phát hiện và xóa tin nhắn chứa các từ ngữ thô tục hoặc nằm trong danh sách cấm của server. Người vi phạm sẽ bị cảnh cáo (Warning).
 - **Bộ lọc Spam (Anti-Spam):** Hệ thống áp dụng cơ chế cửa sổ trượt (Sliding Window) để theo dõi tần suất gửi tin nhắn. Người dùng gửi quá 5 tin nhắn trong 5 giây hoặc gửi lặp lại cùng một nội dung quá 3 lần sẽ bị cảnh cáo và tạm khóa mõm (Mute).
-- **Chống phá hoại (Anti-Nuke):** Bot tự động khóa kênh hoặc thu hồi quyền nếu phát hiện hành vi xóa kênh hàng loạt hoặc kick thành viên hàng loạt trong thời gian ngắn từ một tài khoản.
+- **Chống phá hoại (Chống Phá hoại Máy chủ):** Bot tự động khóa kênh hoặc thu hồi quyền nếu phát hiện hành vi xóa kênh hàng loạt hoặc kick thành viên hàng loạt trong thời gian ngắn từ một tài khoản.
 
 ## 3. HỆ THỐNG HỖ TRỢ (TICKET SYSTEM)
 - **Cách tạo Ticket:** Truy cập kênh hỗ trợ (ví dụ: `#ticket-support`) và nhấn vào nút "Tạo Ticket" để mở một kênh chat riêng tư chỉ có bạn và Ban quản trị.
@@ -28,9 +28,9 @@
   - `.resume`: Tiếp tục phát nhạc.
   - `.stop`: Dừng phát nhạc và bot sẽ rời khỏi kênh thoại.
 
-## 6. KÊNH THOẠI TẠM THỜI (VOICE GENERATOR)
+## 6. KÊNH THOẠI TẠM THỜI (TỰ ĐỘNG TẠO KÊNH THOẠI)
 - **Cách hoạt động:** Khi bạn tham gia vào kênh thoại mang tên "Tạo Kênh Thoại" (được cấu hình trước), hệ thống sẽ tự động tạo một phòng thoại mới cho bạn và di chuyển bạn vào đó.
 - **Tự động dọn dẹp:** Khi tất cả thành viên rời khỏi kênh thoại tạm thời này, bot sẽ tự động xóa kênh để giữ server gọn gàng sạch sẽ.
 
-## 7. PANEL TỰ NHẬN VAI TRÒ (REACTION ROLE PANEL)
+## 7. PANEL TỰ NHẬN VAI TRÒ (TỰ CHỌN VAI TRÒ PANEL)
 - **Cách hoạt động:** Truy cập kênh tự nhận vai trò, hệ thống sẽ gửi một tin nhắn nhúng kèm các nút bấm (Buttons). Nhấn vào nút tương ứng với vai trò (Role) bạn mong muốn để bot tự động cấp hoặc thu hồi vai trò đó cho bạn.

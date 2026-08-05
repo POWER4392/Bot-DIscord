@@ -43,9 +43,9 @@ Du an chia lam 5 Sprint chinh thuc voi phan cong nhiem vu chi tiet nhu sau:
 
 * **Sprint 5.1 (Tuan 5 - Phan 1):** Nang cap AI Vision, RAG, Web Dashboard analytics & CI/CD workflow.
   * **Nguyen Duc Duy (Issue #42):** Nang cap AI Vision, basic RAG, lay token usage counter.
-  * **Tran Duc Manh (Issue #43):** Toi uu database pool, WAL mode, API endpoint cho reaction roles.
+  * **Tran Duc Manh (Issue #43):** Toi uu database pool, WAL mode, API endpoint cho tự chọn vai trò.
   * **Mai Van Viet (Issue #44):** Thiet lap integration tests, stress test va load tests.
-  * **Tong Xuan Nghia (Issue #45):** Giao dien Web Dashboard dynamic voi Chart.js ve token stats va danh sach Reaction Roles.
+  * **Tong Xuan Nghia (Issue #45):** Giao dien Web Dashboard dynamic voi Chart.js ve token stats va danh sach Giao diện Tự chọn Vai trò.
   * **Do Hoang Long (Issue #46):** Setup CI/CD workflow, auto deploy len Render Cloud.
 
 * **Sprint 5.2 (Tuan 5 - Phan 2):** Kiem thu tong the, sua loi, hoan thien tai lieu SDD va phat hanh Release 0.1.0.

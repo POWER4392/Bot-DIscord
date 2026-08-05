@@ -8,21 +8,21 @@ from core.database import cursor, conn, db_lock
 
 class TicketControlView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Khoá & Khắc Phục", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket")
+    @discord.ui.button(label="Đóng Phiên Hỗ Trợ", style=discord.ButtonStyle.danger, custom_id="close_ticket")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if "ticket-" in interaction.channel.name:
-            await interaction.response.send_message("🔒 Vé hỗ trợ này sẽ bị rã đông và xoá sau 5 giây...")
+            await interaction.response.send_message("Kênh hỗ trợ này sẽ tự động đóng sau 5 giây...")
             await asyncio.sleep(5)
             await interaction.channel.delete()
-        else: await interaction.response.send_message("❌ Kênh này không phải vé hỗ trợ.", ephemeral=True)
+        else: await interaction.response.send_message("Kênh này không phải kênh hỗ trợ.", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Tạo Vé Hỗ Trợ Mới", style=discord.ButtonStyle.success, emoji="🎫", custom_id="create_ticket")
+    @discord.ui.button(label="Tạo Yêu Cầu Hỗ Trợ", style=discord.ButtonStyle.success, custom_id="create_ticket")
     async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild, user = interaction.guild, interaction.user
         if discord.utils.get(guild.channels, name=f"ticket-{user.name.lower()}"):
-            return await interaction.response.send_message(f"❌ Bạn đã có một vé hỗ trợ đang mở rồi!", ephemeral=True)
+            return await interaction.response.send_message(f"Bạn đã có một yêu cầu hỗ trợ đang mở.", ephemeral=True)
         
         overwrites = { 
             guild.default_role: discord.PermissionOverwrite(read_messages=False), 
@@ -44,9 +44,9 @@ class TicketView(discord.ui.View):
         if not category: category = await guild.create_category("HỖ TRỢ (TICKETS)")
         ticket_channel = await guild.create_text_channel(f"ticket-{user.name}", category=category, overwrites=overwrites)
         
-        embed = discord.Embed(title="🎫 Kênh Hỗ Trợ Độc Quyền", description=f"Xin chào {user.mention}! Vui lòng mô tả vấn đề của bạn ở đây.\nĐội ngũ Ban Quản Trị sẽ phản hồi sớm nhất có thể.", color=0x5865F2)
+        embed = discord.Embed(title="Kênh Hỗ Trợ Riêng Tư", description=f"Xin chào {user.mention}! Vui lòng mô tả chi tiết vấn đề của bạn tại đây.\nĐội ngũ Ban Quản Trị sẽ phản hồi trong thời gian sớm nhất.", color=0x5865F2)
         await ticket_channel.send(content=f"{user.mention}", embed=embed, view=TicketControlView())
-        await interaction.response.send_message(f"✅ Vé của bạn đã được tạo tại {ticket_channel.mention}", ephemeral=True)
+        await interaction.response.send_message(f"Yêu cầu hỗ trợ của bạn đã được tạo tại {ticket_channel.mention}", ephemeral=True)
 
 class VoiceNameModal(discord.ui.Modal, title="Đăng Ký Khởi Tạo Phòng Thoại"):
     room_name = discord.ui.TextInput(
@@ -186,8 +186,8 @@ class Utilities(commands.Cog):
     @is_mod()
     async def ticket_setup(self, ctx):
         embed = discord.Embed(
-            title="🎫 TRUNG TÂM HỖ TRỢ CHIẾN LƯỢC",
-            description="Bạn có vấn đề cần giải quyết, muốn khiếu nại hoặc đóng góp ý kiến?\nVui lòng ấn vào nút bên dưới để mở một Phiên Hỗ Trợ bí mật cùng Ban Quản Trị.",
+            title="HỆ THỐNG HỖ TRỢ THÀNH VIÊN",
+            description="Bạn có thắc mắc hoặc cần liên hệ Ban Quản Trị? Vui lòng nhấn nút bên dưới để mở phiên hỗ trợ riêng tư.",
             color=0x2B2D31
         )
         if ctx.guild.icon: embed.set_thumbnail(url=ctx.guild.icon.url)

@@ -6,7 +6,7 @@ Tài liệu này lưu trữ tất cả các hình ảnh sơ đồ thiết kế h
 ### 1. Sơ đồ Kiến trúc Hệ thống (High-Level Architecture)
 - **Tên tệp:** `architecture_diagram.png`
 - **Đường dẫn tệp:** [architecture_diagram.png](file:///d:/Code/Bot/docs/images/architecture_diagram.png)
-- **Mô tả:** Sơ đồ khối tổng quan 4 tầng: Web Dashboard → API Server Engine → Discord Bot Core → (Cogs Modules / Database / Gemini AI API).
+- **Mô tả:** Sơ đồ khối tổng quan bao gồm **Web Dashboard & GUI.exe Desktop App** → **API Server Engine** → **Discord Bot Core** → (Cogs Modules / Database Layer / Gemini AI API).
 
 ---
 
@@ -19,9 +19,9 @@ Tài liệu này lưu trữ tất cả các hình ảnh sơ đồ thiết kế h
 
 ### 2. Sơ đồ Hoạt động (Activity Diagrams)
 
-#### 2.1. Luồng AutoMod (Kiểm duyệt tự động)
-- **Tên tệp:** `flowchart_automod.png`
-- **Đường dẫn tệp:** [flowchart_automod.png](file:///d:/Code/Bot/docs/images/flowchart_automod.png)
+#### 2.1. Luồng SmartGuard (Kiểm duyệt tự động)
+- **Tên tệp:** `flowchart_smartguard.png`
+- **Đường dẫn tệp:** [flowchart_smartguard.png](file:///d:/Code/Bot/docs/images/flowchart_smartguard.png)
 - **Mô tả:** Quy trình phân tích tin nhắn và xử lý vi phạm thời gian thực.
 
 #### 2.2. Luồng Phát nhạc YouTube

@@ -24,7 +24,7 @@
 * **Tiêu đề Slide:** Bối cảnh và Thử thách thực tế
 * **Nội dung:**
   - Sự bùng nổ của các cộng đồng Discord lớn đặt ra áp lực quản lý cực kỳ nặng nề cho các Quản trị viên (Moderators).
-  - Các vụ lừa đảo (phishing link), spam tin nhắn, phá hoại server (nuke server) diễn ra với tốc độ cực nhanh, con người không thể xử lý thủ công kịp thời.
+  - Các vụ lừa đảo (phishing link), spam tin nhắn, phá hoại server (phá hoại máy chủ) diễn ra với tốc độ cực nhanh, con người không thể xử lý thủ công kịp thời.
   - Các bot hiện tại thường rời rạc: chỉ có tính năng nhạc, chỉ có mod hoặc chỉ có chatbot riêng biệt.
   - Cần một giải pháp **All-In-One** tích hợp sâu AI để tự động hóa và tối ưu trải nghiệm người dùng.
 
@@ -34,7 +34,7 @@
 * **Tiêu đề Slide:** Mục tiêu Hệ thống
 * **Nội dung:**
   - **Tự động hóa hoàn toàn:** Phát hiện spam, link lừa đảo bằng thuật toán AI và regex nâng cao.
-  - **Tối ưu trải nghiệm:** Độc lập quản lý vai trò tự chọn (Reaction Roles), kênh thoại tạm thời (Voice Generator), hệ thống ticket hỗ trợ trực quan.
+  - **Tối ưu trải nghiệm:** Độc lập quản lý vai trò tự chọn (Giao diện Tự chọn Vai trò), kênh thoại tạm thời (Tự động Tạo Kênh Thoại (Dynamic Voice Channels)), hệ thống ticket hỗ trợ trực quan.
   - **Trải nghiệm giải trí tốt:** Hệ thống phát nhạc chất lượng cao từ YouTube và cơ chế tính điểm hoạt động (Gamification XP/Level).
   - **Cấu hình đa dạng:** Quản lý tập trung qua GUI Desktop và Web Dashboard thông qua REST API kết nối thời gian thực.
 
@@ -64,17 +64,17 @@
 
 ---
 
-### [SLIDE 6] TÍNH NĂNG KIỂM DUYỆT & AUTOMOD
+### [SLIDE 6] TÍNH NĂNG KIỂM DUYỆT & SMARTGUARD
 * **Tiêu đề Slide:** Cơ chế bảo vệ Server tự động
 * **Nội dung:**
-  - **AutoMod:** Tích hợp bộ lọc Regex nâng cao phát hiện liên kết lừa đảo Nitro giả, giftcode giả mạo.
+  - **SmartGuard:** Tích hợp bộ lọc Regex nâng cao phát hiện liên kết lừa đảo Nitro giả, giftcode giả mạo.
   - **Anti-Spam:** Sử dụng thuật toán cửa sổ trượt (Sliding Window Algorithm) phát hiện spam nhanh hơn 5 tin/3.5s.
   - **Blacklist:** Lọc nội dung thô tục, tự động xóa tin nhắn vi phạm và log lại hành vi.
-  - **Anti-Nuke:** Theo dõi số lượng hành động xóa kênh/role của các quản trị viên trong 30s. Nếu phát hiện hành động bất thường, lập tức thu hồi toàn bộ quyền hạn.
+  - **Chống Phá hoại Máy chủ:** Theo dõi số lượng hành động xóa kênh/role của các quản trị viên trong 30s. Nếu phát hiện hành động bất thường, lập tức thu hồi toàn bộ quyền hạn.
 
 ---
 
-### [SLIDE 7] THUẬT TOÁN AUTOMOD: CỬA SỔ TRƯỢT (SLIDING WINDOW)
+### [SLIDE 7] THUẬT TOÁN SMARTGUARD: CỬA SỔ TRƯỢT (SLIDING WINDOW)
 * **Tiêu đề Slide:** Ứng dụng AI/ML: Phát hiện bất thường (Anomaly Detection)
 * **Nội dung:**
   - Cách hoạt động của thuật toán cửa sổ trượt:
@@ -127,7 +127,7 @@
   - **Tính năng chính:**
     - Xem nhanh biểu đồ tài nguyên (Servers, Users, Voice, Ping).
     - Cấu hình Gemini AI trực tiếp từ trình duyệt.
-    - Bộ tạo bảng chọn Role (Reaction Roles) kéo thả/nút bấm linh hoạt.
+    - Bộ tạo bảng chọn Role (Giao diện Tự chọn Vai trò) kéo thả/nút bấm linh hoạt.
     - Soạn thảo và lưu trực tiếp tệp `config.json`.
 
 ---

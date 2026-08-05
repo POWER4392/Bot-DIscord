@@ -19,7 +19,7 @@ Tài liệu này hướng dẫn chi tiết từng bước chuẩn bị và các 
 
 ---
 
-## 2. Kịch bản Demo 1: AutoMod & Anti-Spam (Tính năng Bảo mật)
+## 2. Kịch bản Demo 1: SmartGuard & Anti-Spam (Tính năng Bảo mật)
 * **Mục tiêu:** Trình diễn khả năng tự động phát hiện và xử lý vi phạm cực nhanh của Bot.
 * **Các bước thực hiện:**
   1. Sử dụng tài khoản Discord phụ (không có quyền Admin/Mod) gửi liên kết lừa đảo giả mạo vào kênh chung:
@@ -48,10 +48,10 @@ Tài liệu này hướng dẫn chi tiết từng bước chuẩn bị và các 
 
 ---
 
-## 4. Kịch bản Demo 3: Web Dashboard & Reaction Roles (Tương tác Quản trị)
+## 4. Kịch bản Demo 3: Web Dashboard & Giao diện Tự chọn Vai trò (Tương tác Quản trị)
 * **Mục tiêu:** Trình diễn sự đồng bộ hóa dữ liệu thời gian thực giữa Web UI và Discord.
 * **Các bước thực hiện:**
-  1. Trên Web Dashboard -> Chọn tab **"Reaction Roles"**.
+  1. Trên Web Dashboard -> Chọn tab **"Giao diện Tự chọn Vai trò"**.
   2. Chọn Server và Kênh chat muốn gửi bảng (ví dụ: `#role-tự-chọn`).
   3. Điền tiêu đề: `LỰA CHỌN VAI TRÒ HỌC TẬP`
   4. Điền mô tả: `Nhấn nút bên dưới để nhận vai trò phù hợp của bạn.`

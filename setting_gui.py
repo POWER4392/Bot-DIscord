@@ -994,7 +994,7 @@ ms("KÊNH CHÀO MỪNG:"); combo_welcome_channel = ctk.CTkComboBox(fs_spec, valu
 ms("THÔNG ĐIỆP CHÀO:"); entry_welcome = me()
 ms("THÔNG ĐIỆP TẠM BIỆT:"); entry_leave = me()
 
-ms("QUẢN LÝ TỪ CẤM AUTOMOD (Mỗi từ 1 dòng):")
+ms("QUẢN LÝ TỪ CẤM SMARTGUARD (Mỗi từ 1 dòng):")
 f_bl = ctk.CTkFrame(fs_spec, fg_color="transparent"); f_bl.pack(fill="x", padx=20, pady=(0,10))
 textbox_banned_words = ctk.CTkTextbox(f_bl, width=320, height=100); textbox_banned_words.pack(side="left")
 
@@ -1011,8 +1011,8 @@ def btn_save_blacklist_click():
 
 ctk.CTkButton(f_bl, text="Đồng Bộ File\nTừ Cấm", width=90, height=90, command=btn_save_blacklist_click, fg_color="#DA373C", hover_color="#A12828").pack(side="right")
 
-ms("THỜI GIAN MUTE AUTOMOD (Phút):"); entry_automod_mute_mins = me()
-ms("KÊNH BÁO CÁO AUTOMOD (Từ Cấm):"); combo_automod_channel = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_automod_channel.pack(pady=(0,10), padx=20)
+ms("THỜI GIAN MUTE SMARTGUARD (Phút):"); entry_automod_mute_mins = me()
+ms("KÊNH BÁO CÁO SMARTGUARD (Từ Cấm):"); combo_automod_channel = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_automod_channel.pack(pady=(0,10), padx=20)
 ms("KÊNH NHẬT KÝ (Ghi Logs/Bảo Mật):"); combo_log_channel = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_log_channel.pack(pady=(0,10), padx=20)
 
 ms("ẢNH NỀN (.png/.jpg):")

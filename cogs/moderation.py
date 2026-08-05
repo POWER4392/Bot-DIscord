@@ -25,9 +25,9 @@ class Moderation(commands.Cog):
                 if g_id not in self.blacklist_cache:
                     self.blacklist_cache[g_id] = []
                 self.blacklist_cache[g_id].append(word.strip().lower())
-            print(f"[AutoMod] Đã nạp thành công blacklist cache cho {len(self.blacklist_cache)} server.")
+            print(f"[SmartGuard] Đã nạp thành công blacklist cache cho {len(self.blacklist_cache)} server.")
         except Exception as e:
-            print(f"[AutoMod] Lỗi nạp blacklist cache: {e}")
+            print(f"[SmartGuard] Lỗi nạp blacklist cache: {e}")
 
     async def check_anti_nuke(self, guild, action_type):
         now = datetime.datetime.now().timestamp()
@@ -52,7 +52,7 @@ class Moderation(commands.Cog):
                     if log_channel_id:
                         log_channel = self.bot.get_channel(int(log_channel_id))
                         if log_channel:
-                            embed = discord.Embed(title="🚨 ANTI-NUKE TRIGGERED 🚨", description=f"**{user.name}** đã xóa liên tục kênh/vai trò ({len(anti_nuke_tracker[guild_id][user.id])} lần/30s)!\nHành vi phá hoại đang diễn ra!", color=0x990000)
+                            embed = discord.Embed(title="🚨 PHÁT HIỆN HÀNH VI PHÁ HOẠI MÁY CHỦ 🚨", description=f"**{user.name}** đã xóa liên tục kênh/vai trò ({len(anti_nuke_tracker[guild_id][user.id])} lần/30s)!\nHành vi phá hoại đang diễn ra!", color=0x990000)
                             try: await log_channel.send(embed=embed)
                             except: pass
                     
@@ -185,14 +185,14 @@ class Moderation(commands.Cog):
                 mute_minutes = server_cfg.get("automod_mute_minutes", 5)
                 try:
                     duration = datetime.timedelta(minutes=int(mute_minutes))
-                    await message.author.timeout(duration, reason=f"AutoMod: Sử dụng từ cấm ({trigger_word})")
+                    await message.author.timeout(duration, reason=f"SmartGuard: Sử dụng từ cấm ({trigger_word})")
                 except: pass
                 
                 log_channel_id = server_cfg.get("automod_channel_id")
                 embed = discord.Embed(color=0x2B2D31, description=message.content)
                 embed.set_author(name=message.author.name, icon_url=message.author.display_avatar.url)
                 embed.set_footer(text=f"Từ khóa: {trigger_word} • Quy tắc: Chặn các từ bị cấm • Lý do: Gửi tin nhắn chứa từ cấm")
-                log_msg = f"**AutoMod** ☑️ `[CHÍNH THỨC]` đã cách ly một thành viên do sử dụng ngôn từ không phù hợp."
+                log_msg = f"**SmartGuard** ☑️ `[CHÍNH THỨC]` đã cách ly một thành viên do sử dụng ngôn từ không phù hợp."
                 
                 if log_channel_id:
                     log_channel = self.bot.get_channel(int(log_channel_id))

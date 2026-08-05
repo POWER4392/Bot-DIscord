@@ -22,7 +22,7 @@ Discord là nền tảng giao tiếp trực tuyến phổ biến với hàng tri
 
 ### 1.2 Mục tiêu
 
-- Tự động hóa công tác kiểm duyệt nội dung (AutoMod)
+- Tự động hóa công tác kiểm duyệt nội dung (SmartGuard)
 - Phát hiện và ngăn chặn spam, phishing bằng AI pattern matching
 - Hệ thống theo dõi mạng xã hội tự động
 - Cung cấp tiện ích giải trí (âm nhạc, kinh tế, cấp độ)
@@ -49,7 +49,7 @@ Dự án được thực hiện bởi nhóm gồm 5 thành viên với vai trò 
    - Lập kịch bản kiểm thử (Test Cases) chi tiết cho từng tính năng của bot.
    - Chạy thử nghiệm local và cloud (Black-box & White-box testing) để tìm và ghi nhận log lỗi.
    - Đảm bảo an toàn bảo mật thông tin, quản lý file cấu hình `.env`, `config.json` và `config.example.json`.
-   - Kiểm thử chịu tải hệ thống (anti-spam, anti-nuke).
+   - Kiểm thử chịu tải hệ thống (anti-spam, chống phá hoại máy chủ).
 
 4. **Tống Xuân Nghĩa** (`hendrix810`) **– UI/UX & Content Designer (Thiết kế Giao diện & Nội dung):**
    - Thiết kế giao diện GUI điều khiển Desktop (`setting_gui.py`) bằng `customtkinter`.
@@ -75,7 +75,7 @@ Dự án được thực hiện bởi nhóm gồm 5 thành viên với vai trò 
 | F01 | Phát hiện và xóa link Phishing/Scam tự động | Cao |
 | F02 | Chống spam (>5 tin/3.5 giây → Timeout 5 phút) | Cao |
 | F03 | Bộ lọc từ ngữ theo Blacklist | Cao |
-| F04 | Anti-Nuke: phát hiện xóa kênh/role hàng loạt | Cao |
+| F04 | Chống Phá hoại Máy chủ: phát hiện xóa kênh/role hàng loạt | Cao |
 | F05 | Lệnh Kick, Ban, Mute, Unban, Warn | Cao |
 | F06 | Hệ thống Cảnh cáo (3 warn = Timeout, 5 warn = Kick) | Trung bình |
 | F07 | Log tin nhắn bị xóa/sửa | Trung bình |
@@ -84,8 +84,8 @@ Dự án được thực hiện bởi nhóm gồm 5 thành viên với vai trò 
 | ID | Yêu cầu | Mức độ ưu tiên |
 |----|---------|---------------|
 | F08 | Hệ thống Ticket hỗ trợ | Cao |
-| F09 | Kênh thoại tạm thời (Voice Generator) | Trung bình |
-| F10 | Panel chọn Role tự động (Reaction Roles) | Trung bình |
+| F09 | Kênh thoại tạm thời (Tự động Tạo Kênh Thoại (Dynamic Voice Channels)) | Trung bình |
+| F10 | Panel chọn Role tự động (Giao diện Tự chọn Vai trò) | Trung bình |
 | F11 | Phát nhạc YouTube | Trung bình |
 | F12 | Hệ thống XP & Cấp độ | Thấp |
 | F13 | Theo dõi mạng xã hội (YouTube, TikTok, Reddit, Facebook) | Trung bình |
@@ -170,7 +170,7 @@ social_tracker (guild_id, platform, target_id, channel_id, ping_role, last_post_
 gui_tasks (id, action, payload)
 ```
 
-### 3.3 Luồng xử lý AutoMod (AI Pattern Matching)
+### 3.3 Luồng xử lý SmartGuard (AI Pattern Matching)
 
 ```
 Tin nhắn đến
@@ -179,7 +179,7 @@ Tin nhắn đến
 Có phải Bot? ──(Có)──► Bỏ qua
      │ (Không)
      ▼
-Có quyền Mod/Admin? ──(Có)──► Bỏ qua AutoMod
+Có quyền Mod/Admin? ──(Có)──► Bỏ qua SmartGuard
      │ (Không)
      ▼
 Khớp SCAM_REGEX? ──(Có)──► Xóa + Timeout 1h + Log
@@ -194,7 +194,7 @@ Có từ trong Blacklist? ──(Có)──► Xóa + Timeout + Log
 Xử lý bình thường
 ```
 
-### 3.4 Luồng Anti-Nuke
+### 3.4 Luồng Chống Phá hoại Máy chủ
 
 ```
 Sự kiện: Xóa kênh/role
@@ -254,7 +254,7 @@ Thuật toán:
 ```
 Đây là **Anomaly Detection** đơn giản nhưng hiệu quả, không cần training data.
 
-#### c) Anti-Nuke Detection
+#### c) Chống Phá hoại Máy chủ Detection
 ```
 Thuật toán:
 - Theo dõi tần suất hành động xóa kênh/role
@@ -291,7 +291,7 @@ Bot/
 ├── config.json              # Cấu hình bot (token, prefix...)
 │
 ├── cogs/                    # Các module tính năng (Cog Pattern)
-│   ├── moderation.py        # AutoMod, Kick/Ban/Mute, Anti-Nuke
+│   ├── moderation.py        # SmartGuard, Kick/Ban/Mute, Chống Phá hoại Máy chủ
 │   ├── utilities.py         # Ticket, Voice, Role Panel
 │   ├── music.py             # Phát nhạc YouTube
 │   ├── economy.py           # XP, Level, Daily reward
@@ -376,12 +376,12 @@ bot.add_view(PersistentRoleView(roles_data, f"rr_panel_{msg_id}"))
 
 | # | Tính năng | Trạng thái |
 |---|-----------|-----------|
-| 1 | AutoMod (Phishing, Spam, Blacklist) | ✅ Hoàn thành |
-| 2 | Anti-Nuke Protection | ✅ Hoàn thành |
+| 1 | SmartGuard (Phishing, Spam, Blacklist) | ✅ Hoàn thành |
+| 2 | Chống Phá hoại Máy chủ Protection | ✅ Hoàn thành |
 | 3 | Kick / Ban / Mute / Warn | ✅ Hoàn thành |
 | 4 | Hệ thống Ticket | ✅ Hoàn thành |
-| 5 | Voice Generator (kênh thoại tạm) | ✅ Hoàn thành |
-| 6 | Reaction Role Panel | ✅ Hoàn thành |
+| 5 | Tự động Tạo Kênh Thoại (Dynamic Voice Channels) (kênh thoại tạm) | ✅ Hoàn thành |
+| 6 | Tự chọn Vai trò Panel | ✅ Hoàn thành |
 | 7 | Social Media Monitoring | ✅ Hoàn thành |
 | 8 | Phát nhạc YouTube | ✅ Hoàn thành |
 | 9 | Hệ thống XP & Cấp độ | ✅ Hoàn thành |
