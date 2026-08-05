@@ -1,1513 +1,2441 @@
 import tkinter as tk
+
 from tkinter import messagebox, filedialog
+
 import json
+
 import os
+
 import subprocess
+
 import shutil
+
 import requests as http_requests
+
 import threading
+
 import time
+
 import psutil
+
 from PIL import Image, ImageTk, ImageDraw
+
 import customtkinter as ctk
 
 GUI_SETTINGS_FILE = "gui_settings.json"
+
 bot_processes = {}
 
 def load_gui_settings():
+
     default_settings = {
+
         "active_profile": "Default",
+
         "profiles": {
+
             "Default": {
+
                 "config_file": "config.json",
+
                 "remote_api_url": "",
+
                 "api_secret": "BOT_SECRET_KEY_2026"
+
             }
+
         }
+
     }
+
     if os.path.exists(GUI_SETTINGS_FILE):
+
         try:
+
             with open(GUI_SETTINGS_FILE, "r", encoding="utf-8") as f:
+
                 data = json.load(f)
+
                 if "profiles" in data:
+
                     return data
-                else:
-                    # Migrate old format
+
+else:
+
                     return {
+
                         "active_profile": "Default",
+
                         "profiles": {
+
                             "Default": {
+
                                 "config_file": "config.json",
+
                                 "remote_api_url": data.get("remote_api_url", ""),
+
                                 "api_secret": data.get("api_secret", "BOT_SECRET_KEY_2026")
+
                             }
+
                         }
+
                     }
-        except: pass
-    return default_settings
+
+except: pass
+
+return default_settings
 
 gui_settings = load_gui_settings()
 
 def _remote_request(action, extra_payload=None):
-    default_secret = os.environ.get("API_SECRET") or "BOT_SECRET_KEY_2026"
-    
-    # 1. Lấy cấu hình cổng & secret key Local
-    local_port = "8080"
-    local_key = default_secret
-    try:
-        local_port = entry_api_port.get().strip() or "8080"
-        local_key = cfg.get("api_secret") or default_secret
-    except NameError:
-        active = gui_settings.get("active_profile", "Default")
-        profile = gui_settings.get("profiles", {}).get(active, {})
-        config_file = profile.get("config_file", "config.json")
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    local_cfg = json.load(f)
-                    local_port = str(local_cfg.get("api_port", 8080))
-                    local_key = local_cfg.get("api_secret") or default_secret
-            except: pass
 
-    # 2. Lấy cấu hình URL Remote nếu có
-    remote_url = ""
-    remote_key = default_secret
+    default_secret = os.environ.get("API_SECRET") or "BOT_SECRET_KEY_2026"
+
+    local_port = "8080"
+
+    local_key = default_secret
+
     try:
-        remote_url = entry_remote_url.get().strip().rstrip("/")
-        remote_key = entry_remote_key.get().strip() or default_secret
-    except NameError:
+
+        local_port = entry_api_port.get().strip() or "8080"
+
+        local_key = cfg.get("api_secret") or default_secret
+
+except NameError:
+
         active = gui_settings.get("active_profile", "Default")
+
         profile = gui_settings.get("profiles", {}).get(active, {})
+
+        config_file = profile.get("config_file", "config.json")
+
+        if os.path.exists(config_file):
+
+            try:
+
+                with open(config_file, "r", encoding="utf-8") as f:
+
+                    local_cfg = json.load(f)
+
+                    local_port = str(local_cfg.get("api_port", 8080))
+
+                    local_key = local_cfg.get("api_secret") or default_secret
+
+except: pass
+
+remote_url = ""
+
+    remote_key = default_secret
+
+    try:
+
+        remote_url = entry_remote_url.get().strip().rstrip("/")
+
+        remote_key = entry_remote_key.get().strip() or default_secret
+
+except NameError:
+
+        active = gui_settings.get("active_profile", "Default")
+
+        profile = gui_settings.get("profiles", {}).get(active, {})
+
         remote_url = profile.get("remote_api_url", "").strip().rstrip("/")
+
         remote_key = profile.get("api_secret") or default_secret
 
-    payload = {"action": action}
+payload = {"action": action}
+
     if extra_payload:
+
         payload.update(extra_payload)
 
-    # 3. Nếu có Remote URL hợp lệ (không phải localhost), thử gửi Remote trước
-    if remote_url and "127.0.0.1" not in remote_url and "localhost" not in remote_url:
-        target_url = remote_url.rstrip("/") + "/api"
-        try:
-            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": remote_key}, timeout=4)
-            if resp.status_code in [200, 400, 401, 403]:
-                return resp.json()
-        except Exception:
-            pass  # Nếu Remote không thể kết nối, tự động chuyển sang thử Bot Local bên dưới
+if remote_url and "127.0.0.1" not in remote_url and "localhost" not in remote_url:
 
-    # 4. Thử kết nối Bot Local trên máy (cổng cấu hình, 8080, 8081, 8082)
-    candidate_ports = [local_port] if local_port.isdigit() else []
+        target_url = remote_url.rstrip("/") + "/api"
+
+        try:
+
+            resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": remote_key}, timeout=4)
+
+            if resp.status_code in [200, 400, 401, 403]:
+
+                return resp.json()
+
+except Exception:
+
+            pass
+
+candidate_ports = [local_port] if local_port.isdigit() else []
+
     for p in ["8080", "8081", "8082"]:
+
         if p not in candidate_ports:
+
             candidate_ports.append(p)
 
-    for p in candidate_ports:
+for p in candidate_ports:
+
         target_url = f"http://127.0.0.1:{p}/api"
+
         try:
+
             resp = http_requests.post(target_url, json=payload, headers={"X-API-Key": local_key}, timeout=3)
+
             if resp.status_code in [200, 400, 401, 403]:
+
                 data = resp.json()
+
                 if resp.status_code in [401, 403]:
+
                     data["error"] = f"Lỗi xác thực API ({resp.status_code}): Key xác thực không khớp. Kiểm tra lại Secret Key!"
-                return data
-        except Exception:
+
+return data
+
+except Exception:
+
             continue
 
-    return {"ok": False, "error": "Chưa bật Bot hoặc không kết nối được tới API Server."}
-
+return {"ok": False, "error": "Chưa bật Bot hoặc không kết nối được tới API Server."}
 
 def load_current_config():
+
     active = gui_settings.get("active_profile", "Default")
+
     profile = gui_settings.get("profiles", {}).get(active, {})
+
     url = profile.get("remote_api_url", "").strip().rstrip("/")
+
     if url and "http" in url:
+
         resp = _remote_request("GET_CONFIG")
+
         if resp and resp.get("ok"): return resp.get("data", {})
-        
-    # Fallback to local config file
-    config_file = profile.get("config_file", "config.json")
+
+config_file = profile.get("config_file", "config.json")
+
     if os.path.exists(config_file):
+
         try:
+
             with open(config_file, "r", encoding="utf-8") as f:
+
                 return json.load(f)
-        except: pass
-    return {}
+
+except: pass
+
+return {}
 
 def get_server_data():
+
     resp = _remote_request("GET_SERVER_DATA")
+
     if resp and resp.get("ok") and resp.get("data"):
+
         return resp.get("data")
-    
-    # Fallback to local config's servers list if offline
-    fallback_data = {}
+
+fallback_data = {}
+
     try:
+
         active = gui_settings.get("active_profile", "Default")
+
         profile = gui_settings.get("profiles", {}).get(active, {})
+
         config_file = profile.get("config_file", "config.json")
+
         if os.path.exists(config_file):
+
             with open(config_file, "r", encoding="utf-8") as f:
+
                 local_cfg = json.load(f)
+
                 for sid, sval in local_cfg.get("servers", {}).items():
+
                     s_name = sval.get("name") if isinstance(sval, dict) and sval.get("name") else f"Server {sid}"
+
                     clean_name = s_name.replace(" (Offline)", "").replace(" (Offline/Chưa kết nối)", "")
+
                     fallback_data[sid] = {
+
                         "name": f"{clean_name} (Offline)",
+
                         "channels": sval.get("cached_channels", []) if isinstance(sval, dict) else [],
+
                         "roles": sval.get("cached_roles", []) if isinstance(sval, dict) else [],
+
                         "categories": sval.get("cached_categories", []) if isinstance(sval, dict) else []
+
                     }
-    except Exception: pass
+
+except Exception: pass
+
     return fallback_data
 
 def get_server_display_name(sid, sdata):
+
     name = sdata.get("name", f"Server {sid}")
+
     return f"{name} [{sid}]"
 
 def parse_server_id_from_choice(choice):
+
     if not choice or choice in ["Chọn Server", "Chọn Server bên dưới...", "(Nhấn F5 để tải Server)"]:
+
         return None
-    if "[" in choice and choice.endswith("]"):
+
+if "[" in choice and choice.endswith("]"):
+
         sid = choice.rsplit("[", 1)[-1].rstrip("]")
+
         if sid in srv_data:
+
             return sid
-    if choice in srv_data:
+
+if choice in srv_data:
+
         return choice
-    for sid, sdata in srv_data.items():
+
+for sid, sdata in srv_data.items():
+
         if sdata.get("name") == choice:
+
             return sid
-    return None
+
+return None
 
 def update_server_comboboxes():
+
     global srv_data
+
     srv_data = get_server_data()
+
     server_options = ["Chọn Server"] + [get_server_display_name(k, v) for k, v in srv_data.items()]
+
     if 'combo_servers' in globals():
+
         curr = combo_servers.get()
+
         combo_servers.configure(values=server_options)
+
         if curr in server_options:
+
             combo_servers.set(curr)
-        else:
+
+else:
+
             combo_servers.set("Chọn Server")
-    if 'combo_social_server' in globals():
+
+if 'combo_social_server' in globals():
+
         social_options = [get_server_display_name(k, v) for k, v in srv_data.items()]
+
         combo_social_server.configure(values=social_options)
 
-# --- QUẢN LÝ TIẾN TRÌNH BOT ---
 def is_bot_running(profile_name):
+
     proc = bot_processes.get(profile_name)
+
     if proc and proc.poll() is None:
+
         return True
-    
-    # Search system processes matching config filename
-    profile = gui_settings["profiles"].get(profile_name)
+
+profile = gui_settings["profiles"].get(profile_name)
+
     if not profile: return False
+
     config_file = profile.get("config_file", "config.json")
+
     current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
+
     for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+
         try:
+
             cmd = proc_info.info.get('cmdline') or []
+
             cmd_str = " ".join(cmd).lower()
+
             if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+
                 if f"--config={config_file}".lower() in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+
                     if any(current_dir in os.path.normpath(arg).lower() for arg in cmd):
+
                         bot_processes[profile_name] = psutil.Process(proc_info.info['pid'])
+
                         return True
-        except: pass
-    return False
+
+except: pass
+
+return False
 
 def update_status_label():
+
     active = gui_settings.get("active_profile", "Default")
+
     if is_bot_running(active):
+
         if 'lbl_status' in globals():
+
             lbl_status.configure(text=f"TRẠNG THÁI: ĐANG HOẠT ĐỘNG 🚀 ({active})", text_color="#23A559")
-    else:
+
+else:
+
         if 'lbl_status' in globals():
+
             lbl_status.configure(text=f"TRẠNG THÁI: ĐÃ DỪNG ({active})", text_color="#DA373C")
 
 def stop_bot_sync(profile_name=None):
+
     if not profile_name:
+
         profile_name = gui_settings.get("active_profile", "Default")
-    profile = gui_settings["profiles"].get(profile_name)
+
+profile = gui_settings["profiles"].get(profile_name)
+
     config_file = profile.get("config_file", "config.json") if profile else "config.json"
-    
+
     proc = bot_processes.get(profile_name)
+
     if proc:
+
         try:
+
             for child in proc.children(recursive=True): child.kill()
+
             proc.kill()
-        except: pass
+
+except: pass
+
         bot_processes[profile_name] = None
-        
-    current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
+
+current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
+
     for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+
         try:
+
             cmd = proc_info.info.get('cmdline') or []
+
             cmd_str = " ".join(cmd).lower()
+
             if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+
                 if f"--config={config_file}".lower() in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+
                     if any(current_dir in os.path.normpath(arg).lower() for arg in cmd):
+
                         spider = psutil.Process(proc_info.info['pid'])
+
                         for child in spider.children(recursive=True): child.kill()
+
                         spider.kill()
-        except: pass
+
+except: pass
 
 def stop_bot():
+
     def _bg_stop():
+
         active = gui_settings.get("active_profile", "Default")
+
         stop_bot_sync(active)
+
         root.after(0, update_status_label)
-    threading.Thread(target=_bg_stop, daemon=True).start()
+
+threading.Thread(target=_bg_stop, daemon=True).start()
 
 def start_bot():
+
     def _bg_start():
+
         active = gui_settings.get("active_profile", "Default")
+
         profile = gui_settings["profiles"].get(active)
+
         if not profile: return
+
         config_file = profile.get("config_file", "config.json")
 
         stop_bot_sync(active)
+
         time.sleep(0.5)
 
         try:
+
             import sys
+
             if not os.path.exists(config_file):
+
                 default_cfg = {"token": "", "prefix": "!", "api_port": 8080}
+
                 with open(config_file, "w", encoding="utf-8") as f:
+
                     json.dump(default_cfg, f, indent=4, ensure_ascii=False)
 
-            python_exe = sys.executable
+python_exe = sys.executable
+
             if os.name == 'nt' and os.path.exists(os.path.join(".venv", "Scripts", "python.exe")):
+
                 python_exe = os.path.join(".venv", "Scripts", "python.exe")
-            elif os.path.exists(os.path.join(".venv", "bin", "python")):
+
+elif os.path.exists(os.path.join(".venv", "bin", "python")):
+
                 python_exe = os.path.join(".venv", "bin", "python")
 
-            bot_processes[active] = subprocess.Popen([python_exe, "main.py", f"--config={config_file}"])
+bot_processes[active] = subprocess.Popen([python_exe, "main.py", f"--config={config_file}"])
+
             time.sleep(1.0)
+
             root.after(0, update_status_label)
-        except Exception as e:
+
+except Exception as e:
+
             root.after(0, lambda: messagebox.showerror("Lỗi", f"Không thể bật Bot: {e}"))
 
-    threading.Thread(target=_bg_start, daemon=True).start()
+threading.Thread(target=_bg_start, daemon=True).start()
 
 def select_file(entry_widget, title, types):
+
     source_path = filedialog.askopenfilename(title=title, filetypes=types)
+
     if source_path:
+
         filename = os.path.basename(source_path)
+
         dest_path = os.path.join(os.getcwd(), filename)
+
         try:
+
             if os.path.abspath(source_path) != os.path.abspath(dest_path):
+
                 shutil.copy2(source_path, dest_path)
-            entry_widget.delete(0, tk.END); entry_widget.insert(0, filename)
-        except Exception as e: messagebox.showerror("Lỗi Copy", str(e))
+
+entry_widget.delete(0, tk.END); entry_widget.insert(0, filename)
+
+except Exception as e: messagebox.showerror("Lỗi Copy", str(e))
 
 def preview_position():
+
     if not current_server_id: return messagebox.showerror("Lỗi", "Vui lòng Chọn Server ở mục TRẠM ĐIỀU KHIỂN trước khi căn chỉnh!")
+
     bg_file = entry_bg.get()
+
     if not os.path.exists(bg_file): return messagebox.showerror("Lỗi", "Không tìm thấy file ảnh nền! Vui lòng Upload lại.")
-    
+
     editor = tk.Toplevel(root)
+
     bg_img = Image.open(bg_file).convert("RGBA")
+
     canvas = tk.Canvas(editor, width=bg_img.width, height=bg_img.height)
+
     canvas.pack()
-    
+
     bg_tk = ImageTk.PhotoImage(bg_img)
+
     canvas.create_image(0, 0, image=bg_tk, anchor=tk.NW)
+
     editor.bg_tk = bg_tk
-    
+
     try: curr_size = int(entry_size.get())
+
     except: curr_size = 200
+
     try: curr_x = int(entry_x.get()); curr_y = int(entry_y.get())
+
     except: curr_x, curr_y = 0, 0
-        
+
     drag_data = {"x": 0, "y": 0, "item": None}
+
     def create_avg(size):
+
         img = Image.new("RGBA", (size, size), (0,0,0,0))
+
         ImageDraw.Draw(img).ellipse((0,0,size,size), fill=(255,0,0,180))
+
         return ImageTk.PhotoImage(img)
-    
-    av_tk = create_avg(curr_size)
+
+av_tk = create_avg(curr_size)
+
     av_item = canvas.create_image(curr_x, curr_y, image=av_tk, anchor=tk.NW, tags="av")
+
     editor.av_tk = av_tk
-    
+
     def on_drag_start(e): drag_data["item"] = av_item; drag_data["x"], drag_data["y"] = e.x, e.y
+
     def on_drag_motion(e):
+
         if drag_data["item"]:
+
             canvas.move(av_item, e.x - drag_data["x"], e.y - drag_data["y"])
+
             drag_data["x"], drag_data["y"] = e.x, e.y
-    def on_drag_stop(e):
+
+def on_drag_stop(e):
+
         if drag_data["item"]:
+
             c = canvas.coords(av_item)
+
             entry_x.delete(0, tk.END); entry_x.insert(0, str(int(c[0])))
+
             entry_y.delete(0, tk.END); entry_y.insert(0, str(int(c[1])))
+
             drag_data["item"] = None
 
-    canvas.tag_bind("av", "<ButtonPress-1>", on_drag_start)
+canvas.tag_bind("av", "<ButtonPress-1>", on_drag_start)
+
     canvas.tag_bind("av", "<B1-Motion>", on_drag_motion)
+
     canvas.tag_bind("av", "<ButtonRelease-1>", on_drag_stop)
 
     fc = tk.Frame(editor); fc.pack(fill=tk.X)
+
     sc = tk.Scale(fc, from_=50, to=800, orient=tk.HORIZONTAL)
+
     sc.set(curr_size); sc.pack(fill=tk.X)
+
     def update_size(v):
+
         ns = int(v); nat = create_avg(ns)
+
         canvas.itemconfig(av_item, image=nat); editor.av_tk = nat
+
         entry_size.delete(0, tk.END); entry_size.insert(0, str(ns))
-    sc.config(command=update_size)
+
+sc.config(command=update_size)
+
     editor.transient(root); editor.grab_set()
 
-# --- LƯU CẤU HÌNH ---
 def save_settings():
+
     try:
+
         active = gui_settings.get("active_profile", "Default")
+
         profile = gui_settings.get("profiles", {}).get(active, {})
+
         config_file = profile.get("config_file", "config.json")
 
         cfg["token"] = entry_token.get().strip()
-        _prefix_val = entry_prefix.get()  # KHÔNG strip() - ký tự đặc biệt cần giữ nguyên
+
+        _prefix_val = entry_prefix.get()
+
         cfg["prefix"] = _prefix_val if _prefix_val else "!"
+
         cfg["api_port"] = int(entry_api_port.get().strip()) if entry_api_port.get().strip().isdigit() else 8080
+
         cfg["gemini_api_key"] = entry_gemini_key.get().strip()
+
         cfg["openai_api_key"] = entry_openai_key.get().strip()
 
         cfg["cmd_play"] = entry_cmd_play.get()
+
         cfg["cmd_stop"] = entry_cmd_stop.get()
+
         cfg["cmd_skip"] = entry_cmd_skip.get()
+
         cfg["cmd_pause"] = entry_cmd_pause.get()
+
         cfg["cmd_resume"] = entry_cmd_resume.get()
+
         cfg["cmd_kick"] = entry_cmd_kick.get()
+
         cfg["cmd_ban"] = entry_cmd_ban.get()
+
         cfg["cmd_mute"] = entry_cmd_mute.get()
+
         cfg["cmd_clear"] = entry_cmd_clear.get()
+
         cfg["cmd_ping"] = entry_cmd_ping.get()
+
         cfg["cmd_addword"] = entry_cmd_addword.get()
+
         cfg["cmd_delword"] = entry_cmd_delword.get()
+
         cfg["cmd_warn"] = entry_cmd_warn.get()
+
         cfg["cmd_timed_role"] = entry_cmd_timed_role.get()
 
         cfg["cmd_profile"] = entry_cmd_profile.get()
+
         cfg["cmd_setup_voice"] = entry_cmd_setup_voice.get()
+
         cfg["cmd_ticket_setup"] = entry_cmd_ticket_setup.get()
-        
+
         if current_server_id:
+
             if "servers" not in cfg: cfg["servers"] = {}
+
             if current_server_id not in cfg["servers"]: cfg["servers"][current_server_id] = {}
+
             sc = cfg["servers"][current_server_id]
+
             if current_server_data.get("name"):
+
                 clean_name = current_server_data.get("name").replace(" (Offline)", "").replace(" (Offline/Chưa kết nối)", "")
+
                 sc["name"] = clean_name
-            
-            # Chỉ cập nhật ID khi bot đang online và đã fetch được dữ liệu thực tế
-            if current_server_data.get("channels"):
+
+if current_server_data.get("channels"):
+
                 sel_chan = combo_welcome_channel.get()
+
                 sc["welcome_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_chan), None)
-                
+
                 sel_am_chan = combo_automod_channel.get()
+
                 sc["automod_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_am_chan), None)
-                
+
                 sel_log_chan = combo_log_channel.get()
+
                 sc["log_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == sel_log_chan), None)
 
                 sc["boost_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == combo_boost_channel.get()), None)
+
                 sc["rr_channel_id"] = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == combo_rr_channel.get()), None)
-            
-            t_mute = entry_automod_mute_mins.get()
+
+t_mute = entry_automod_mute_mins.get()
+
             sc["automod_mute_minutes"] = int(t_mute) if t_mute.isdigit() else 5
-            
+
             sc["welcome_message"] = entry_welcome.get()
+
             sc["leave_message"] = entry_leave.get()
+
             sc["background_image"] = entry_bg.get()
+
             sc["font_file"] = entry_font.get()
+
             try:
+
                 sc["avatar_x"] = int(entry_x.get())
+
                 sc["avatar_y"] = int(entry_y.get())
+
                 sc["avatar_size"] = int(entry_size.get())
-            except: pass
-            
+
+except: pass
+
             if current_server_data.get("roles"):
+
                 sel_auto = combo_auto_role.get()
+
                 sc["auto_role_id"] = next((r["id"] for r in current_server_data.get("roles", []) if r["name"] == sel_auto), None)
 
                 sc["mod_role_ids"] = [r["id"] for r in current_mod_roles]
+
                 if "mod_role_id" in sc: del sc["mod_role_id"]
 
                 sel_booster_role = combo_booster_role.get()
+
                 sc["booster_role_id"] = next((str(r["id"]) for r in current_server_data.get("roles", []) if r["name"] == sel_booster_role), None)
 
                 sc["rr_roles_list"] = [r["id"] for r in current_rr_roles]
-            
-            if current_server_data.get("categories"):
+
+if current_server_data.get("categories"):
+
                 sel_voice_category = combo_voice_category.get()
+
                 sc["voice_category_id"] = next((str(c["id"]) for c in current_server_data.get("categories", []) if c["name"] == sel_voice_category), None)
 
-            sc["boost_message"] = entry_boost_msg.get().strip() or "🚀 **{mention}** vừa boost server! Cảm ơn vì sự ủng hộ của bạn! 💜"
+sc["boost_message"] = entry_boost_msg.get().strip() or "🚀 **{mention}** vừa boost server! Cảm ơn vì sự ủng hộ của bạn! 💜"
+
             sc["rr_title"] = entry_rr_title.get()
 
-        with open(config_file, "w", encoding="utf-8") as f:
+with open(config_file, "w", encoding="utf-8") as f:
+
             json.dump(cfg, f, indent=4, ensure_ascii=False)
 
-        url = profile.get("remote_api_url", "").strip().rstrip("/")
+url = profile.get("remote_api_url", "").strip().rstrip("/")
+
         if url and "http" in url:
+
             resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
+
             if not resp or not resp.get("ok"):
+
                 err_msg = resp.get("error") if resp else "Không thể kết nối đến Cloud API (Sai URL, sai Secret Key hoặc Server Cloud chưa bật)"
+
                 return False, err_msg
-            return True, "cloud"
-        return True, "local"
-    except Exception as e:
+
+return True, "cloud"
+
+return True, "local"
+
+except Exception as e:
+
         return False, str(e)
 
 def save_and_reset():
+
     def _bg_save():
+
         ok, mode_or_err = save_settings()
+
         if not ok:
+
             root.after(0, lambda: messagebox.showwarning("Cảnh Báo Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Server Remote:\n\n❌ {mode_or_err}\n\nBot vẫn duy trì hoạt động."))
+
             return
-            
-        active = gui_settings.get("active_profile", "Default")
+
+active = gui_settings.get("active_profile", "Default")
+
         resp = _remote_request("UPDATE_CONFIG", {"payload": cfg})
+
         if resp and resp.get("ok"):
+
             root.after(0, lambda: messagebox.showinfo("Thành Công (Hot-Reload)", "✅ Đã lưu & đồng bộ Cấu Hình NÓNG thành công!\n\nBot vẫn đang ONLINE 24/7 không bị gián đoạn kết nối."))
-        else:
+
+else:
+
             if not is_bot_running(active):
+
                 root.after(0, lambda: messagebox.showinfo("Thành Công Local", "✅ Đã lưu cấu hình cục bộ thành công! (Bấm ▶ CHẠY BOT để khởi động)"))
-            else:
+
+else:
+
                 root.after(0, lambda: messagebox.showinfo("Thành Công Local", "✅ Đã lưu cấu hình cục bộ thành công!"))
 
-    threading.Thread(target=_bg_save, daemon=True).start()
+threading.Thread(target=_bg_save, daemon=True).start()
 
-# --- GIAO DIỆN CHÍNH ---
 ctk.set_appearance_mode("dark")
+
 root = ctk.CTk()
+
 root.title("Quản Lý Bot Đa Server")
+
 root.geometry("540x950")
 
-# ================= PROFILE MANAGER =================
 f_prof_mgr = ctk.CTkFrame(root, fg_color="#1E1F22", corner_radius=10)
+
 f_prof_mgr.pack(fill="x", padx=10, pady=5)
 
 ctk.CTkLabel(f_prof_mgr, text="👤 Profile:", font=("Segoe UI", 12, "bold")).pack(side="left", padx=10, pady=5)
 
 def reload_gui_inputs():
+
     global cfg, current_server_id, current_server_data
-    
-    # Reload remote inputs first so that subsequent network requests use the correct new API URL/Key
+
     active = gui_settings["active_profile"]
+
     prof = gui_settings["profiles"][active]
+
     entry_remote_url.delete(0, tk.END); entry_remote_url.insert(0, prof.get("remote_api_url", ""))
+
     entry_remote_key.delete(0, tk.END); entry_remote_key.insert(0, prof.get("api_secret", "BOT_SECRET_KEY_2026"))
-    
+
     cfg = load_current_config()
-    
-    # Reload entry fields
+
     entry_token.delete(0, tk.END); entry_token.insert(0, cfg.get("token", ""))
+
     entry_prefix.delete(0, tk.END); entry_prefix.insert(0, cfg.get("prefix", "!"))
+
     entry_api_port.delete(0, tk.END); entry_api_port.insert(0, str(cfg.get("api_port", 8080)))
+
     entry_openai_key.delete(0, tk.END); entry_openai_key.insert(0, cfg.get("openai_api_key", os.environ.get("OPENAI_API_KEY", "")))
+
     if 'entry_openai_model' in globals():
+
         entry_openai_model.delete(0, tk.END); entry_openai_model.insert(0, cfg.get("openai_model", "gpt-4o-mini"))
-    if 'entry_ai_channel' in globals():
+
+if 'entry_ai_channel' in globals():
+
         entry_ai_channel.delete(0, tk.END); entry_ai_channel.insert(0, cfg.get("ai_channel_id", ""))
-    if 'entry_ai_prompt' in globals():
+
+if 'entry_ai_prompt' in globals():
+
         entry_ai_prompt.delete(0, tk.END); entry_ai_prompt.insert(0, cfg.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện."))
-    
-    entry_cmd_play.delete(0, tk.END); entry_cmd_play.insert(0, cfg.get("cmd_play", "play"))
+
+entry_cmd_play.delete(0, tk.END); entry_cmd_play.insert(0, cfg.get("cmd_play", "play"))
+
     entry_cmd_stop.delete(0, tk.END); entry_cmd_stop.insert(0, cfg.get("cmd_stop", "stop"))
+
     entry_cmd_skip.delete(0, tk.END); entry_cmd_skip.insert(0, cfg.get("cmd_skip", "skip"))
+
     entry_cmd_pause.delete(0, tk.END); entry_cmd_pause.insert(0, cfg.get("cmd_pause", "pause"))
+
     entry_cmd_resume.delete(0, tk.END); entry_cmd_resume.insert(0, cfg.get("cmd_resume", "resume"))
+
     entry_cmd_ping.delete(0, tk.END); entry_cmd_ping.insert(0, cfg.get("cmd_ping", "ping"))
-    
+
     entry_cmd_mute.delete(0, tk.END); entry_cmd_mute.insert(0, cfg.get("cmd_mute", "mute"))
+
     entry_cmd_clear.delete(0, tk.END); entry_cmd_clear.insert(0, cfg.get("cmd_clear", "clear"))
+
     entry_cmd_addword.delete(0, tk.END); entry_cmd_addword.insert(0, cfg.get("cmd_addword", "addword"))
+
     entry_cmd_warn.delete(0, tk.END); entry_cmd_warn.insert(0, cfg.get("cmd_warn", "warn"))
-    
+
     entry_cmd_kick.delete(0, tk.END); entry_cmd_kick.insert(0, cfg.get("cmd_kick", "kick"))
+
     entry_cmd_ban.delete(0, tk.END); entry_cmd_ban.insert(0, cfg.get("cmd_ban", "ban"))
+
     entry_cmd_delword.delete(0, tk.END); entry_cmd_delword.insert(0, cfg.get("cmd_delword", "delword"))
+
     entry_cmd_timed_role.delete(0, tk.END); entry_cmd_timed_role.insert(0, cfg.get("cmd_timed_role", "timed_role"))
-    
+
     entry_cmd_profile.delete(0, tk.END); entry_cmd_profile.insert(0, cfg.get("cmd_profile", "profile"))
+
     entry_cmd_setup_voice.delete(0, tk.END); entry_cmd_setup_voice.insert(0, cfg.get("cmd_setup_voice", "setup_voice"))
+
     entry_cmd_ticket_setup.delete(0, tk.END); entry_cmd_ticket_setup.insert(0, cfg.get("cmd_ticket_setup", "ticket_setup"))
-    
-    # Reload server lists
+
     update_server_comboboxes()
-    
-    # Reset active server selection
+
     current_server_id = None
+
     current_server_data = {}
-    
-    # Update status label
+
     update_status_label()
 
 def on_profile_change(choice):
+
     if choice == "Chọn Profile...": return
+
     gui_settings["active_profile"] = choice
+
     try:
+
         with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+
             json.dump(gui_settings, f, indent=4, ensure_ascii=False)
-    except: pass
+
+except: pass
+
     reload_gui_inputs()
 
 combo_profiles = ctk.CTkComboBox(f_prof_mgr, values=list(gui_settings["profiles"].keys()), width=180, command=on_profile_change)
+
 combo_profiles.set(gui_settings["active_profile"])
+
 combo_profiles.pack(side="left", padx=5, pady=5)
 
 def add_profile():
+
     dialog = ctk.CTkInputDialog(text="Nhập tên Profile mới:", title="Thêm Profile")
+
     val = dialog.get_input()
+
     if not val: return
+
     name = val.strip()
+
     if not name or name in gui_settings["profiles"]:
+
         return messagebox.showerror("Lỗi", "Tên profile không hợp lệ hoặc đã tồn tại!")
-        
-    config_file_name = f"config_{name.lower().replace(' ', '_')}.json"
-    
-    # Auto increment api port
+
+config_file_name = f"config_{name.lower().replace(' ', '_')}.json"
+
     ports = [8080]
+
     for p in gui_settings["profiles"].values():
+
         if os.path.exists(p.get("config_file", "")):
+
             try:
+
                 with open(p["config_file"], "r", encoding="utf-8") as f:
+
                     c = json.load(f)
+
                     if c.get("api_port"): ports.append(c["api_port"])
-            except: pass
-    next_port = max(ports) + 1
-    
+
+except: pass
+
+next_port = max(ports) + 1
+
     default_cfg = {
+
         "token": "",
+
         "prefix": "!",
+
         "api_port": next_port,
+
         "database_name": f"bot_{name.lower().replace(' ', '_')}"
+
     }
+
     try:
+
         with open(config_file_name, "w", encoding="utf-8") as f:
+
             json.dump(default_cfg, f, indent=4, ensure_ascii=False)
-    except Exception as e:
+
+except Exception as e:
+
         return messagebox.showerror("Lỗi", f"Không tạo được file cấu hình: {e}")
-        
-    gui_settings["profiles"][name] = {
+
+gui_settings["profiles"][name] = {
+
         "config_file": config_file_name,
+
         "remote_api_url": "",
+
         "api_secret": "BOT_SECRET_KEY_2026"
+
     }
+
     gui_settings["active_profile"] = name
-    
+
     try:
+
         with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+
             json.dump(gui_settings, f, indent=4, ensure_ascii=False)
-    except: pass
-    
+
+except: pass
+
     combo_profiles.configure(values=list(gui_settings["profiles"].keys()))
+
     combo_profiles.set(name)
+
     reload_gui_inputs()
+
     messagebox.showinfo("Thành công", f"Đã thêm profile '{name}' và tạo file cấu hình '{config_file_name}'!")
 
 def delete_profile():
+
     active = gui_settings["active_profile"]
+
     if active == "Default":
+
         return messagebox.showerror("Lỗi", "Không thể xóa Profile Default mặc định!")
-    if messagebox.askyesno("Xác nhận", f"Bạn có chắc muốn xóa Profile '{active}'?"):
+
+if messagebox.askyesno("Xác nhận", f"Bạn có chắc muốn xóa Profile '{active}'?"):
+
         stop_bot()
+
         del gui_settings["profiles"][active]
+
         gui_settings["active_profile"] = "Default"
+
         try:
+
             with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+
                 json.dump(gui_settings, f, indent=4, ensure_ascii=False)
-        except: pass
+
+except: pass
+
         combo_profiles.configure(values=list(gui_settings["profiles"].keys()))
+
         combo_profiles.set("Default")
+
         reload_gui_inputs()
 
 ctk.CTkButton(f_prof_mgr, text="➕ Thêm", width=60, fg_color="#23A559", hover_color="#1A7A41", command=add_profile).pack(side="left", padx=3)
+
 ctk.CTkButton(f_prof_mgr, text="✕ Xóa", width=60, fg_color="#DA373C", hover_color="#A12828", command=delete_profile).pack(side="left", padx=3)
 
 cfg = load_current_config()
+
 srv_data = get_server_data()
+
 current_server_id = None
+
 current_server_data = {}
 
 tabview = ctk.CTkTabview(root)
+
 tabview.pack(fill="both", expand=True, padx=5, pady=5)
+
 tab_system = tabview.add("⚙️ HỆ THỐNG")
+
 tab_cmds = tabview.add("📝 LỆNH TÙY BIỂN")
+
 tab_server = tabview.add("🌐 QUẢN LÝ SERVER")
+
 tab_social = tabview.add("📡 SOCIAL MEDIA")
 
 sf_cmds = ctk.CTkScrollableFrame(tab_cmds, fg_color="transparent")
+
 sf_cmds.pack(fill="both", expand=True)
+
 sf_server = ctk.CTkScrollableFrame(tab_server, fg_color="transparent")
+
 sf_server.pack(fill="both", expand=True)
+
 sf_social = ctk.CTkScrollableFrame(tab_social, fg_color="transparent")
+
 sf_social.pack(fill="both", expand=True)
 
-# Create sub-tabview inside tab_system for 2 compartments: Local & Cloud
 sub_tabview = ctk.CTkTabview(tab_system)
+
 sub_tabview.pack(fill="both", expand=True, padx=2, pady=2)
 
 tab_local_tab = sub_tabview.add("💻 CẤU HÌNH LOCAL")
+
 tab_cloud_tab = sub_tabview.add("☁️ CẤU HÌNH CLOUD")
 
 sf_local = ctk.CTkScrollableFrame(tab_local_tab, fg_color="transparent")
+
 sf_local.pack(fill="both", expand=True)
 
 sf_cloud = ctk.CTkScrollableFrame(tab_cloud_tab, fg_color="transparent")
+
 sf_cloud.pack(fill="both", expand=True)
 
-# ——— Helper functions ———
 def make_secret_field(parent, label_text, cfg_key="", default="", initial_value=None, width=380):
+
     """Tạo một ô nhập có nút 👁 ẩn/hiện ký tự."""
+
     ctk.CTkLabel(parent, text=label_text, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=14, pady=(8, 0))
+
     row = ctk.CTkFrame(parent, fg_color="transparent")
+
     row.pack(fill="x", padx=14, pady=(2, 6))
+
     val = initial_value if initial_value is not None else (str(cfg.get(cfg_key, default)) if cfg_key else default)
+
     entry = ctk.CTkEntry(row, width=width, height=32, show="●")
+
     entry.insert(0, val)
+
     entry.pack(side="left")
+
     _v = [False]
+
     def _toggle():
+
         if _v[0]:
+
             entry.configure(show="●")
+
             _btn.configure(text="👁")
+
             _v[0] = False
-        else:
+
+else:
+
             entry.configure(show="")
+
             _btn.configure(text="🙈")
+
             _v[0] = True
-    _btn = ctk.CTkButton(row, text="👁", width=36, height=32,
+
+_btn = ctk.CTkButton(row, text="👁", width=36, height=32,
+
                           fg_color="#3A3D42", hover_color="#4A4D52",
+
                           font=("Segoe UI", 14), command=_toggle)
+
     _btn.pack(side="left", padx=(5, 0))
+
     return entry
 
 def mki(p, l, k, d=""):
+
     ctk.CTkLabel(p, text=l, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=14, pady=(6,0))
+
     e = ctk.CTkEntry(p, width=420, height=30)
+
     e.insert(0, str(cfg.get(k, d)))
+
     e.pack(anchor="w", padx=14, pady=(2,6))
+
     return e
 
-# ==================================================================
-# ████  NGĂN 1: CẤU HÌNH LOCAL (Chạy trực tiếp trên máy)  ██████████
-# ==================================================================
-
-# — 1. Bảo mật & Token —
 fc_secret = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
+
                           border_width=1, border_color="#DA373C")
+
 fc_secret.pack(fill="x", padx=5, pady=(8, 4))
+
 _sh = ctk.CTkFrame(fc_secret, fg_color="transparent")
+
 _sh.pack(fill="x", padx=14, pady=(8, 0))
+
 ctk.CTkLabel(_sh, text="🔐  BẢO MẬT & XÁC THỰC",
+
              font=("Segoe UI", 13, "bold"), text_color="#DA373C").pack(side="left")
+
 ctk.CTkLabel(_sh, text="⚠️  Không chia sẻ cho bất kỳ ai!",
+
              font=("Segoe UI", 10), text_color="#FEE75C").pack(side="left", padx=(10, 0))
+
 entry_token    = make_secret_field(fc_secret, "🤖  DISCORD BOT TOKEN:", "token")
+
 entry_api_port = mki(fc_secret, "🔌  LOCAL API PORT (Webserver):", "api_port", "8080")
+
 ctk.CTkFrame(fc_secret, fg_color="transparent", height=4).pack()
 
-
-# — 1.5. CẤU HÌNH API AI CHUYÊN BIỆT (CHATGPT & GOOGLE GEMINI) —
 fc_ai_config = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
+
                             border_width=1, border_color="#5865F2")
+
 fc_ai_config.pack(fill="x", padx=5, pady=(4, 6))
 
 _ai_h = ctk.CTkFrame(fc_ai_config, fg_color="transparent")
+
 _ai_h.pack(fill="x", padx=14, pady=(8, 0))
+
 ctk.CTkLabel(_ai_h, text="🤖  CẤU HÌNH API AI CHUYÊN BIỆT (CHATGPT & GOOGLE GEMINI)",
+
              font=("Segoe UI", 13, "bold"), text_color="#5865F2").pack(side="left")
+
 ctk.CTkLabel(_ai_h, text="⚡ Đồng bộ ngay khi lưu (Local & Cloud)",
+
              font=("Segoe UI", 10), text_color="#57F287").pack(side="left", padx=(10, 0))
 
 entry_openai_key   = make_secret_field(fc_ai_config, "🧠  CHATGPT (OPENAI) API KEY:", "openai_api_key")
+
 entry_gemini_key   = make_secret_field(fc_ai_config, "💎  GOOGLE GEMINI API KEY:", "gemini_api_key")
 
 def save_ai_config_action():
+
     def _bg_ai():
+
         try:
+
             okey = entry_openai_key.get().strip()
+
             gkey = entry_gemini_key.get().strip()
+
             chid = cfg.get("ai_channel_id", "")
+
             prompt = cfg.get("ai_system_prompt", "Bạn là một trợ lý ảo Discord thân thiện.")
 
             cfg["openai_api_key"] = okey
+
             cfg["gemini_api_key"] = gkey
+
             if okey and not gkey:
+
                 cfg["ai_provider"] = "openai"
-            elif gkey and not okey:
+
+elif gkey and not okey:
+
                 cfg["ai_provider"] = "gemini"
 
-            if okey:
+if okey:
+
                 os.environ["OPENAI_API_KEY"] = okey
-            if gkey:
+
+if gkey:
+
                 os.environ["GEMINI_API_KEY"] = gkey
 
-            active = gui_settings.get("active_profile", "Default")
+active = gui_settings.get("active_profile", "Default")
+
             profile = gui_settings.get("profiles", {}).get(active, {})
+
             config_file = profile.get("config_file", "config.json")
+
             with open(config_file, "w", encoding="utf-8") as f:
+
                 json.dump(cfg, f, indent=4, ensure_ascii=False)
 
-            payload = {
+payload = {
+
                 "openai_api_key": okey,
+
                 "gemini_api_key": gkey,
+
                 "ai_channel_id": chid,
+
                 "ai_system_prompt": prompt,
+
                 "ai_provider": cfg.get("ai_provider", "openai")
+
             }
+
             _remote_request("SET_AI_CONFIG", {"payload": payload})
 
             root.after(0, lambda: messagebox.showinfo("Thành công", "✅ Đã lưu & đồng bộ Cấu hình API AI (OpenAI & Gemini) thành công!"))
-        except Exception as ex:
+
+except Exception as ex:
+
             root.after(0, lambda: messagebox.showerror("Lỗi", f"❌ Lỗi khi đồng bộ API AI: {ex}"))
 
-    threading.Thread(target=_bg_ai, daemon=True).start()
+threading.Thread(target=_bg_ai, daemon=True).start()
 
 ctk.CTkButton(fc_ai_config,
+
                text="💾 LƯU & ĐỒNG BỘ API AI (LOCAL & CLOUD)",
+
                height=34, width=320,
+
                font=("Segoe UI", 12, "bold"), fg_color="#5865F2", hover_color="#4752C4",
+
                command=save_ai_config_action).pack(pady=(6, 12))
 
-
 fc_local_ctrl = ctk.CTkFrame(sf_local, fg_color="#1E1F22", corner_radius=10,
+
                                border_width=1, border_color="#23A559")
+
 fc_local_ctrl.pack(fill="x", padx=5, pady=(4, 10))
+
 ctk.CTkLabel(fc_local_ctrl, text="💻  TRẠNG THÁI & ĐIỀU KHIỂN LOCAL",
+
              font=("Segoe UI", 13, "bold"), text_color="#23A559").pack(anchor="w", padx=14, pady=(8, 0))
+
 lbl_status = ctk.CTkLabel(fc_local_ctrl,
+
                            text="TRẠNG THÁI: ĐANG KIỂM TRA...",
+
                            text_color="#FEE75C", font=("Segoe UI", 14, "bold"))
+
 lbl_status.pack(pady=(4, 2))
+
 _ctrl_row = ctk.CTkFrame(fc_local_ctrl, fg_color="transparent")
+
 _ctrl_row.pack(pady=(4, 6))
+
 ctk.CTkButton(_ctrl_row, text="▶ CHẠY BOT", height=38, width=130,
+
                font=("Segoe UI", 13, "bold"), fg_color="#23A559", hover_color="#1A7A41",
+
                command=start_bot).pack(side="left", padx=5)
+
 ctk.CTkButton(_ctrl_row, text="⏹ NGỪNG", height=38, width=110,
+
                font=("Segoe UI", 13, "bold"), fg_color="#DA373C", hover_color="#A12828",
+
                command=stop_bot).pack(side="left", padx=5)
+
 ctk.CTkButton(fc_local_ctrl,
+
                text="💾 LƯU CẤU HÌNH & TÁI KHỞI ĐỘNG",
+
                height=36, width=320,
+
                font=("Segoe UI", 13, "bold"), fg_color="#5865F2", hover_color="#4752C4",
+
                command=save_and_reset).pack(pady=(2, 12))
 
-
-# ==================================================================
-# ████  NGĂN 2: CẤU HÌNH CLOUD (Deploy / Điều khiển từ xa)  █████████
-# ==================================================================
-
-# — Điều khiển & Đồng bộ từ xa (Remote API / Server) —
 fr = ctk.CTkFrame(sf_cloud, fg_color="#1C1E20", corner_radius=10,
+
                    border_width=1, border_color="#F1C40F")
+
 fr.pack(fill="x", padx=5, pady=(8, 4))
+
 _frh = ctk.CTkFrame(fr, fg_color="transparent")
+
 _frh.pack(fill="x", padx=14, pady=(8, 0))
+
 ctk.CTkLabel(_frh, text="🛰️  ĐỒNG BỘ & ĐIỀU KHIỂN CLOUD SERVER",
+
              font=("Segoe UI", 13, "bold"), text_color="#F1C40F").pack(side="left")
+
 ctk.CTkLabel(_frh, text="DisCloud / VPS / Render",
+
              font=("Segoe UI", 10), text_color="#72767D").pack(side="left", padx=(10, 0))
+
 ctk.CTkLabel(fr,
+
              text="Nhập địa chỉ API của Bot Cloud để đẩy dữ liệu cấu hình và kiểm tra kết nối.\n"
+
                   "Database Neon PostgreSQL tự động được kết nối qua chuỗi kết nối trong hệ thống.",
+
              font=("Segoe UI", 10), text_color="#B5BAC1").pack(anchor="w", padx=14, pady=(3, 0))
+
 ctk.CTkLabel(fr, text="API URL (Server Cloud):", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=14, pady=(6, 0))
+
 active_prof_name = gui_settings.get("active_profile", "Default")
+
 active_prof = gui_settings.get("profiles", {}).get(active_prof_name, {})
+
 entry_remote_url = ctk.CTkEntry(fr, width=420, height=32,
+
                                  placeholder_text="http://12.34.56.78:8080  hoặc  https://my-bot.onrender.com")
+
 entry_remote_url.insert(0, active_prof.get("remote_api_url", ""))
+
 entry_remote_url.pack(anchor="w", padx=14, pady=(2, 6))
 
 entry_remote_key = make_secret_field(fr, "🔑  API SECRET KEY:", "",
+
                                       active_prof.get("api_secret", "BOT_SECRET_KEY_2026"))
 
 lbl_remote_status = ctk.CTkLabel(fr, text="◉ Chưa kết nối",
+
                                   font=("Segoe UI", 12, "bold"), text_color="#72767D")
+
 lbl_remote_status.pack(pady=(4, 2))
 
 def ping_remote():
+
     def task():
+
         result = _remote_request("STATUS")
+
         if result and result.get("ok"):
+
             info = f"🤖 {result.get('bot')}  |  {result.get('guilds')} server  |  {result.get('latency_ms')}ms"
+
             lbl_remote_status.configure(text=f"✅ Online — {info}", text_color="#23A559")
-        elif result:
+
+elif result:
+
             lbl_remote_status.configure(text=f"❌ {result.get('error','Lỗi không xác định')}", text_color="#DA373C")
-        else:
+
+else:
+
             lbl_remote_status.configure(text="❌ Mất kết nối", text_color="#DA373C")
-    threading.Thread(target=task, daemon=True).start()
+
+threading.Thread(target=task, daemon=True).start()
 
 def push_config_remote():
+
     active = gui_settings["active_profile"]
+
     prof = gui_settings["profiles"][active]
+
     prof["remote_api_url"] = entry_remote_url.get().strip()
+
     prof["api_secret"] = entry_remote_key.get().strip()
+
     with open(GUI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+
         json.dump(gui_settings, f, indent=4, ensure_ascii=False)
-    global cfg; cfg = load_current_config()
-    
+
+global cfg; cfg = load_current_config()
+
     url = prof.get("remote_api_url", "").strip()
+
     if not url or "http" not in url:
+
         messagebox.showwarning("Cảnh Báo", "Vui lòng nhập địa chỉ API Cloud Server (ví dụ: http://12.34.56.78:8080) trước khi đẩy dữ liệu!")
+
         return
 
-    ok, mode_or_err = save_settings()
+ok, mode_or_err = save_settings()
+
     if ok and mode_or_err == "cloud":
+
         messagebox.showinfo("Thành Công Cloud", "Đã lưu và đẩy thành công toàn bộ dữ liệu cấu hình lên Cloud Server!")
+
         ping_remote()
-    elif not ok:
+
+elif not ok:
+
         messagebox.showerror("Lỗi Đẩy Cloud", f"Đã lưu cục bộ nhưng KHÔNG THỂ đẩy lên Cloud Server:\n\n❌ {mode_or_err}")
-    update_server_comboboxes()
+
+update_server_comboboxes()
 
 _cloud_btns = ctk.CTkFrame(fr, fg_color="transparent")
+
 _cloud_btns.pack(pady=(4, 14), padx=14, fill="x")
+
 ctk.CTkButton(_cloud_btns, text="📡 Ping Bot Cloud", width=140, height=36,
+
                fg_color="#2C2F33", hover_color="#3A3D42",
+
                font=("Segoe UI", 12, "bold"), command=ping_remote).pack(side="left", padx=4)
+
 ctk.CTkButton(_cloud_btns, text="⬆️  ĐẨY TẤT CẢ DỮ LIỆU LÊN CLOUD", width=220, height=36,
+
                fg_color="#F1A000", hover_color="#D4900A", text_color="black",
+
                font=("Segoe UI", 12, "bold"), command=push_config_remote).pack(side="left", padx=4)
 
-# — 1. Tiền tố Lệnh (Prefix) —
 fc_prefix = ctk.CTkFrame(sf_cmds, fg_color="#1F2010", corner_radius=10,
+
                           border_width=1, border_color="#FEE75C")
+
 fc_prefix.pack(fill="x", padx=10, pady=(10, 4))
+
 _ph = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+
 _ph.pack(fill="x", padx=14, pady=(8, 0))
+
 ctk.CTkLabel(_ph, text="✏️  TIỀN TỐ LỆNH BOT (PREFIX)",
+
              font=("Segoe UI", 13, "bold"), text_color="#FEE75C").pack(side="left")
+
 ctk.CTkLabel(_ph, text="Ký tự đứng trước các lệnh tùy biến",
+
              font=("Segoe UI", 10), text_color="#72767D").pack(side="left", padx=(10, 0))
+
 ctk.CTkLabel(fc_prefix,
+
              text="Có thể là 1 ký tự hoặc nhiều ký tự (ví dụ: !  /  m.  ./  bot.)",
+
              font=("Segoe UI", 10), text_color="#B5BAC1").pack(anchor="w", padx=14, pady=(3, 0))
+
 _pr = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+
 _pr.pack(fill="x", padx=14, pady=(6, 4))
+
 ctk.CTkLabel(_pr, text="TIỀN TỐ:", font=("Segoe UI", 11, "bold")).pack(side="left")
+
 entry_prefix = ctk.CTkEntry(_pr, width=96, height=34, font=("Segoe UI", 18, "bold"), placeholder_text="!")
+
 entry_prefix.insert(0, str(cfg.get("prefix", "!")))
+
 entry_prefix.pack(side="left", padx=(8, 14))
+
 _pfx_ex = ctk.StringVar(value=f"{cfg.get('prefix','!')}play  ·  {cfg.get('prefix','!')}skip  ·  {cfg.get('prefix','!')}ban")
+
 ctk.CTkLabel(_pr, textvariable=_pfx_ex, font=("Segoe UI", 11, "bold"), text_color="#57F287").pack(side="left")
+
 def _upd_pfx(*_):
+
     v = entry_prefix.get() or "!"
+
     _pfx_ex.set(f"{v}play  ·  {v}skip  ·  {v}ban")
+
 entry_prefix.bind("<KeyRelease>", _upd_pfx)
+
 _prow = ctk.CTkFrame(fc_prefix, fg_color="transparent")
+
 _prow.pack(fill="x", padx=14, pady=(0, 10))
+
 ctk.CTkLabel(_prow, text="Chọn nhanh:", font=("Segoe UI", 10), text_color="#72767D").pack(side="left")
+
 for _pv in ["!", "/", ".", ">", "$", "m.", "./"]:
+
     def _mp(v):
+
         def _s(): entry_prefix.delete(0, "end"); entry_prefix.insert(0, v); _upd_pfx()
+
         return _s
-    ctk.CTkButton(_prow, text=_pv, width=44, height=26,
+
+ctk.CTkButton(_prow, text=_pv, width=44, height=26,
+
                    fg_color="#3A3D42", hover_color="#5865F2",
+
                    font=("Segoe UI", 12, "bold"), command=_mp(_pv)).pack(side="left", padx=2)
 
 fcmd_music = ctk.CTkFrame(sf_cmds, fg_color="#2B2D31", corner_radius=12)
+
 fcmd_music.pack(pady=10, fill="x", padx=10)
+
 ctk.CTkLabel(fcmd_music, text="🎵 LỆNH ĐIỀU KHIỂN ÂM NHẠC", font=("Segoe UI", 15, "bold"), text_color="#5865F2").pack(pady=5)
 
 fcmd_music_l = ctk.CTkFrame(fcmd_music, fg_color="transparent"); fcmd_music_l.pack(side="left", fill="both", expand=True)
+
 fcmd_music_r = ctk.CTkFrame(fcmd_music, fg_color="transparent"); fcmd_music_r.pack(side="left", fill="both", expand=True)
 
 fcmd_mod = ctk.CTkFrame(sf_cmds, fg_color="#2B2D31", corner_radius=12)
+
 fcmd_mod.pack(pady=20, fill="x", padx=10)
+
 ctk.CTkLabel(fcmd_mod, text="🛡️ LỆNH QUẢN TRỊ KÊNH", font=("Segoe UI", 15, "bold"), text_color="#ED4245").pack(pady=5)
 
 fcmd_mod_l = ctk.CTkFrame(fcmd_mod, fg_color="transparent"); fcmd_mod_l.pack(side="left", fill="both", expand=True)
+
 fcmd_mod_r = ctk.CTkFrame(fcmd_mod, fg_color="transparent"); fcmd_mod_r.pack(side="left", fill="both", expand=True)
 
 def mki_grid(p, l, k, d=""):
+
     ctk.CTkLabel(p, text=l, font=("Segoe UI", 12)).pack(anchor="w", padx=10)
+
     e = ctk.CTkEntry(p, width=180, height=30)
+
     e.insert(0, str(cfg.get(k, d)))
+
     e.pack(pady=(0,10), padx=10)
+
     return e
 
-# Music commands
 entry_cmd_play = mki_grid(fcmd_music_l, "🎵 Play:", "cmd_play", "play")
+
 entry_cmd_skip = mki_grid(fcmd_music_l, "⏭️ Skip:", "cmd_skip", "skip")
+
 entry_cmd_resume = mki_grid(fcmd_music_l, "▶️ Resume:", "cmd_resume", "resume")
+
 entry_cmd_ping = mki_grid(fcmd_music_l, "🏓 Ping:", "cmd_ping", "ping")
 
 entry_cmd_stop = mki_grid(fcmd_music_r, "⏹️ Stop:", "cmd_stop", "stop")
+
 entry_cmd_pause = mki_grid(fcmd_music_r, "⏸️ Pause:", "cmd_pause", "pause")
 
-# Mod commands
 entry_cmd_mute = mki_grid(fcmd_mod_l, "🔇 Mute:", "cmd_mute", "mute")
+
 entry_cmd_clear = mki_grid(fcmd_mod_l, "🧹 Clear:", "cmd_clear", "clear")
+
 entry_cmd_addword = mki_grid(fcmd_mod_l, "➕ Add Word:", "cmd_addword", "addword")
+
 entry_cmd_warn = mki_grid(fcmd_mod_l, "⚠️ Warn:", "cmd_warn", "warn")
 
 entry_cmd_kick = mki_grid(fcmd_mod_r, "🔨 Kick:", "cmd_kick", "kick")
+
 entry_cmd_ban = mki_grid(fcmd_mod_r, "⛔ Ban:", "cmd_ban", "ban")
+
 entry_cmd_delword = mki_grid(fcmd_mod_r, "🗑️ Del Word:", "cmd_delword", "delword")
+
 entry_cmd_timed_role = mki_grid(fcmd_mod_r, "⏳ Timed Role:", "cmd_timed_role", "timed_role")
 
-# XP & Utilities
 fcmd_eco = ctk.CTkFrame(sf_cmds, fg_color="#2B2D31", corner_radius=12)
+
 fcmd_eco.pack(pady=10, fill="x", padx=10)
+
 ctk.CTkLabel(fcmd_eco, text="🏆 LỆNH XP & TIỆN ÍCH", font=("Segoe UI", 15, "bold"), text_color="#5865F2").pack(pady=5)
 
 fcmd_eco_l = ctk.CTkFrame(fcmd_eco, fg_color="transparent"); fcmd_eco_l.pack(side="left", fill="both", expand=True)
+
 fcmd_eco_r = ctk.CTkFrame(fcmd_eco, fg_color="transparent"); fcmd_eco_r.pack(side="left", fill="both", expand=True)
 
 entry_cmd_profile = mki_grid(fcmd_eco_l, "🏆 Profile:", "cmd_profile", "profile")
 
 entry_cmd_setup_voice = mki_grid(fcmd_eco_r, "🎙️ Setup Voice:", "cmd_setup_voice", "setup_voice")
+
 entry_cmd_ticket_setup = mki_grid(fcmd_eco_r, "🎫 Setup Ticket:", "cmd_ticket_setup", "ticket_setup")
 
-
-# --- KHỐI SERVER ---
 fsrv = ctk.CTkFrame(sf_server, fg_color="#5865F2", corner_radius=12); fsrv.pack(pady=10, fill="x")
+
 ctk.CTkLabel(fsrv, text="🌐 TRẠM ĐIỀU KHIỂN SERVER TÙY CHỈNH", font=("Segoe UI", 16, "bold"), text_color="white").pack(pady=(15,5))
 
 f_srv_row = ctk.CTkFrame(fsrv, fg_color="transparent")
+
 f_srv_row.pack(pady=(0,15))
 
 combo_servers = ctk.CTkComboBox(f_srv_row, values=["Chọn Server"] + [get_server_display_name(k, v) for k, v in srv_data.items()], width=310, height=40, font=("Segoe UI", 13, "bold"))
+
 combo_servers.pack(side="left", padx=5)
 
 def btn_refresh_servers_click():
+
     update_server_comboboxes()
+
     messagebox.showinfo("Thông báo", f"Đã cập nhật danh sách Server! ({len(srv_data)} server)")
 
 ctk.CTkButton(f_srv_row, text="🔄 Tải Lại", width=95, height=40, font=("Segoe UI", 12, "bold"), fg_color="#23A559", hover_color="#1A7A41", command=btn_refresh_servers_click).pack(side="left", padx=5)
 
-# SERVER SPECIFIC CONTROLS
 fs_spec = ctk.CTkFrame(sf_server, fg_color="#2B2D31", corner_radius=12); fs_spec.pack(pady=10, fill="x")
+
 ctk.CTkLabel(fs_spec, text="(Cài đặt sẽ chỉ lưu riêng cho Server được chọn)", text_color="#FEE75C").pack(pady=(10,0))
 
 def load_sv_cf(k, d=""):
+
     return str(cfg.get("servers", {}).get(current_server_id, {}).get(k, d))
 
 def ms(l): ctk.CTkLabel(fs_spec, text=l, font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=20)
+
 def me():
+
     e = ctk.CTkEntry(fs_spec, width=420, height=30)
+
     e.pack(pady=(0,10), padx=20)
+
     return e
 
 ms("KÊNH CHÀO MỪNG:"); combo_welcome_channel = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_welcome_channel.pack(pady=(0,10), padx=20)
+
 ms("THÔNG ĐIỆP CHÀO:"); entry_welcome = me()
+
 ms("THÔNG ĐIỆP TẠM BIỆT:"); entry_leave = me()
 
 ms("QUẢN LÝ TỪ CẤM SMARTGUARD (Mỗi từ 1 dòng):")
+
 f_bl = ctk.CTkFrame(fs_spec, fg_color="transparent"); f_bl.pack(fill="x", padx=20, pady=(0,10))
+
 textbox_banned_words = ctk.CTkTextbox(f_bl, width=320, height=100); textbox_banned_words.pack(side="left")
 
 def btn_save_blacklist_click():
+
     if not current_server_id: return messagebox.showwarning("Cảnh báo", "Vui lòng chọn Server!")
+
     text_content = textbox_banned_words.get("1.0", tk.END).strip()
+
     words = [w.strip() for w in text_content.split('\n') if w.strip()]
+
     try:
+
         _remote_request("DB_QUERY", {"query": "DELETE FROM blacklists WHERE guild_id=?", "params": [str(current_server_id)]})
+
         for w in words:
+
             _remote_request("DB_QUERY", {"query": "INSERT INTO blacklists (guild_id, word) VALUES (?, ?)", "params": [str(current_server_id), w]})
-        messagebox.showinfo("Thành công", f"Đã cập nhật {len(words)} từ cấm thành công lên DB cho Server!")
-    except Exception as e: messagebox.showerror("Lỗi", str(e))
+
+messagebox.showinfo("Thành công", f"Đã cập nhật {len(words)} từ cấm thành công lên DB cho Server!")
+
+except Exception as e: messagebox.showerror("Lỗi", str(e))
 
 ctk.CTkButton(f_bl, text="Đồng Bộ File\nTừ Cấm", width=90, height=90, command=btn_save_blacklist_click, fg_color="#DA373C", hover_color="#A12828").pack(side="right")
 
 ms("THỜI GIAN MUTE SMARTGUARD (Phút):"); entry_automod_mute_mins = me()
+
 ms("KÊNH BÁO CÁO SMARTGUARD (Từ Cấm):"); combo_automod_channel = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_automod_channel.pack(pady=(0,10), padx=20)
+
 ms("KÊNH NHẬT KÝ (Ghi Logs/Bảo Mật):"); combo_log_channel = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_log_channel.pack(pady=(0,10), padx=20)
 
 ms("ẢNH NỀN (.png/.jpg):")
+
 ff1 = ctk.CTkFrame(fs_spec, fg_color="transparent"); ff1.pack(fill="x", padx=20, pady=(0,10))
+
 entry_bg = ctk.CTkEntry(ff1, width=320); entry_bg.pack(side="left")
+
 ctk.CTkButton(ff1, text="Chọn Ảnh", width=80, command=lambda: select_file(entry_bg, "Ảnh Nền", [("Image", "*.png;*.jpg")])).pack(side="right")
 
 ms("CHỮ NGHỆ THUẬT (.ttf):")
+
 ff2 = ctk.CTkFrame(fs_spec, fg_color="transparent"); ff2.pack(fill="x", padx=20, pady=(0,10))
+
 entry_font = ctk.CTkEntry(ff2, width=320); entry_font.pack(side="left")
+
 ctk.CTkButton(ff2, text="Chọn Font", width=80, command=lambda: select_file(entry_font, "Font", [("Font", "*.ttf")])).pack(side="right")
 
 f_coord = ctk.CTkFrame(fs_spec, fg_color="transparent"); f_coord.pack(fill="x", padx=20, pady=10)
+
 ctk.CTkLabel(f_coord, text="X:").pack(side="left"); entry_x = ctk.CTkEntry(f_coord, width=60); entry_x.pack(side="left", padx=5)
+
 ctk.CTkLabel(f_coord, text="  Y:").pack(side="left"); entry_y = ctk.CTkEntry(f_coord, width=60); entry_y.pack(side="left", padx=5)
+
 ctk.CTkLabel(f_coord, text="  Size:").pack(side="left"); entry_size = ctk.CTkEntry(f_coord, width=60); entry_size.pack(side="left", padx=5)
+
 ctk.CTkButton(fs_spec, text="👁 MỞ STUDIO KÉO THẢ AVATAR", fg_color="#5865F2", hover_color="#4752C4", command=preview_position).pack(pady=10)
 
 ms("AUTO ROLE (Gán tự động — khi không có xác minh):"); combo_auto_role = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu"], width=420); combo_auto_role.pack(pady=(0,10), padx=20)
+
 ms("DANH MỤC LƯU PHÒNG THOẠI (Temp Voice):"); combo_voice_category = ctk.CTkComboBox(fs_spec, values=["Không Yêu Cầu (Tạo thư mục mặc định)"], width=420); combo_voice_category.pack(pady=(0,10), padx=20)
 
 ms("MOD ROLES (Quyền Quản Trị):")
+
 f_mod_roles_container = ctk.CTkScrollableFrame(fs_spec, height=100, fg_color="#1E1F22")
+
 f_mod_roles_container.pack(fill="x", padx=20, pady=5)
+
 f_mod_controls = ctk.CTkFrame(fs_spec, fg_color="transparent")
+
 f_mod_controls.pack(fill="x", padx=20, pady=(5, 20))
 
 combo_mod_add = ctk.CTkComboBox(f_mod_controls, values=["Không Yêu Cầu"], width=280)
+
 combo_mod_add.pack(side="left", padx=(0,10))
 
 current_mod_roles = []
+
 current_rr_roles = []
+
 ui_mod_tags = []
 
 def refresh_mod_roles_ui():
+
     for t in ui_mod_tags:
+
         try: t.destroy()
+
         except: pass
-    ui_mod_tags.clear()
+
+ui_mod_tags.clear()
+
     for mr in current_mod_roles:
+
         ft = ctk.CTkFrame(f_mod_roles_container, fg_color="#ED4245", corner_radius=6)
+
         ft.pack(fill="x", padx=5, pady=2)
+
         ctk.CTkLabel(ft, text=mr["name"], text_color="white", font=("Segoe UI", 12, "bold")).pack(side="left", padx=10, pady=2)
+
         btn_del = ctk.CTkButton(ft, text="X", width=20, fg_color="#DA373C", hover_color="#A12828", command=lambda r=mr["id"]: remove_mod_role(r))
+
         btn_del.pack(side="right", padx=5, pady=2)
+
         ui_mod_tags.append(ft)
 
 def remove_mod_role(r_id):
+
     global current_mod_roles
+
     current_mod_roles = [r for r in current_mod_roles if r["id"] != r_id]
+
     refresh_mod_roles_ui()
 
 def btn_add_mod_role():
+
     r_val = combo_mod_add.get()
+
     if r_val == "Không Yêu Cầu": return
+
     r_id = next((str(r["id"]) for r in current_server_data.get("roles", []) if r["name"] == r_val), None)
+
     if not r_id: return
+
     if any(r["id"] == str(r_id) for r in current_mod_roles):
+
         return messagebox.showwarning("Lỗi", "Role này đã được thêm rồi!")
-    current_mod_roles.append({"id": str(r_id), "name": r_val})
+
+current_mod_roles.append({"id": str(r_id), "name": r_val})
+
     refresh_mod_roles_ui()
 
 ctk.CTkButton(f_mod_controls, text="➕ Thêm Mod", width=90, fg_color="#ED4245", hover_color="#A12828", command=btn_add_mod_role).pack(side="left")
 
-# ================= BOOST SERVER =================
 f_boost = ctk.CTkFrame(sf_server, fg_color="#2B2D31", corner_radius=12); f_boost.pack(pady=10, fill="x", padx=10)
+
 ctk.CTkLabel(f_boost, text="💜 BOOST SERVER", font=("Segoe UI", 16, "bold"), text_color="#FF73FA").pack(pady=10)
 
 def mb(l): ctk.CTkLabel(f_boost, text=l, font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=20)
+
 def me_b(): e = ctk.CTkEntry(f_boost, width=420, height=30); e.pack(pady=(0,10), padx=20); return e
 
 mb("KÊNH THÔNG BÁO BOOST:")
+
 combo_boost_channel = ctk.CTkComboBox(f_boost, values=["Không Yêu Cầu"], width=420); combo_boost_channel.pack(pady=(0,10), padx=20)
+
 mb("ROLE TỰ ĐỘNG CẤP CHO BOOSTER:")
+
 combo_booster_role = ctk.CTkComboBox(f_boost, values=["Không Yêu Cầu"], width=420); combo_booster_role.pack(pady=(0,10), padx=20)
+
 mb("THÔNG ĐIỆP BOOST (Dùng {mention} cho mention, {name} cho tên):")
+
 entry_boost_msg = me_b()
 
-# ================= KHOẢNG BẢNG CHỌN VAI TRÒ =================
 f_rr = ctk.CTkFrame(sf_server, fg_color="#2B2D31", corner_radius=12); f_rr.pack(pady=10, fill="x", padx=10)
+
 ctk.CTkLabel(f_rr, text="🎛 BẢNG CHỌN VAI TRÒ (REACTION ROLES)", font=("Segoe UI", 16, "bold"), text_color="#F1C40F").pack(pady=10)
 
 def mr(l): ctk.CTkLabel(f_rr, text=l, font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=20)
+
 def me_rr(): e = ctk.CTkEntry(f_rr, width=420, height=30); e.pack(pady=(0,10), padx=20); return e
 
 mr("Kênh Chứa Menu Role:")
+
 combo_rr_channel = ctk.CTkComboBox(f_rr, values=["Không Yêu Cầu"], width=420); combo_rr_channel.pack(pady=(0,10), padx=20)
 
 mr("Tiêu Đề Menu (Ví dụ: Hãy chọn Game bạn chơi):")
+
 entry_rr_title = me_rr()
+
 mr("Mô Tả Phụ (Hiển thị dưới tiêu đề, để trống để bỏ qua):")
+
 entry_rr_desc = me_rr()
 
 f_rr_roles_container = ctk.CTkScrollableFrame(f_rr, height=150, fg_color="#1E1F22")
+
 f_rr_roles_container.pack(fill="x", padx=20, pady=5)
 
 f_rr_controls = ctk.CTkFrame(f_rr, fg_color="transparent")
+
 f_rr_controls.pack(fill="x", padx=20, pady=5)
 
 combo_rr_add = ctk.CTkComboBox(f_rr_controls, values=["Không Yêu Cầu"], width=220)
+
 combo_rr_add.pack(side="left", padx=(0,5))
 
 current_rr_roles = []
+
 ui_tags_list = []
+
 def refresh_rr_roles_ui():
+
     for tag in ui_tags_list:
+
         try: tag.destroy()
+
         except: pass
-    ui_tags_list.clear()
+
+ui_tags_list.clear()
+
     for tr in current_rr_roles:
+
         f_tag = ctk.CTkFrame(f_rr_roles_container, fg_color="#3B3D44", corner_radius=8)
+
         f_tag.pack(fill="x", padx=5, pady=3)
+
         info_frame = ctk.CTkFrame(f_tag, fg_color="transparent")
+
         info_frame.pack(side="left", fill="x", expand=True, padx=8, pady=4)
+
         ctk.CTkLabel(info_frame, text=f"◆  {tr['name']}", text_color="#5865F2", font=("Segoe UI", 12, "bold")).pack(anchor="w")
+
         desc_text = tr.get("desc", "")
+
         if desc_text:
+
             ctk.CTkLabel(info_frame, text=desc_text[:80], text_color="#B5BAC1", font=("Segoe UI", 10), wraplength=280, justify="left").pack(anchor="w")
-        btn_del = ctk.CTkButton(f_tag, text="✕", width=26, height=26, fg_color="#DA373C", hover_color="#A12828", font=("Segoe UI", 11, "bold"), command=lambda r=tr["id"]: remove_rr_role(r))
+
+btn_del = ctk.CTkButton(f_tag, text="✕", width=26, height=26, fg_color="#DA373C", hover_color="#A12828", font=("Segoe UI", 11, "bold"), command=lambda r=tr["id"]: remove_rr_role(r))
+
         btn_del.pack(side="right", padx=6, pady=4)
+
         ui_tags_list.append(f_tag)
 
 def remove_rr_role(r_id):
+
     global current_rr_roles
+
     current_rr_roles = [r for r in current_rr_roles if r["id"] != r_id]
+
     refresh_rr_roles_ui()
 
 def btn_add_rr_role():
+
     r_val = combo_rr_add.get()
+
     if not r_val or r_val == "Không Yêu Cầu": return
+
     if len(current_rr_roles) >= 25: return messagebox.showwarning("Lỗi", "Tối đa 25 Role mỗi Menu!")
+
     r_id = next((str(r["id"]) for r in current_server_data.get("roles", []) if r["name"] == r_val), None)
+
     if not r_id: return
+
     if any(r["id"] == r_id for r in current_rr_roles): return messagebox.showwarning("Lỗi", "Role này đã được thêm rồi!")
-    
-    # Popup nhập mô tả
+
     desc_win = ctk.CTkToplevel(root)
+
     desc_win.title(f"Mô tả cho @{r_val}")
+
     desc_win.geometry("420x180")
+
     desc_win.grab_set()
+
     ctk.CTkLabel(desc_win, text=f"Nhập mô tả ngắn cho role  ◆  {r_val}:", font=("Segoe UI", 12, "bold")).pack(pady=(15,5), padx=20)
+
     entry_desc_input = ctk.CTkEntry(desc_win, width=380, height=32, placeholder_text="Ví dụ: Người chơi CS2, nhận thông báo sự kiện...")
+
     entry_desc_input.pack(padx=20, pady=5)
+
     def confirm_add():
+
         desc_val = entry_desc_input.get().strip()
+
         current_rr_roles.append({"id": r_id, "name": r_val, "desc": desc_val})
+
         refresh_rr_roles_ui()
+
         desc_win.destroy()
-    ctk.CTkButton(desc_win, text="✅ Thêm Role", fg_color="#5865F2", command=confirm_add).pack(pady=10)
+
+ctk.CTkButton(desc_win, text="✅ Thêm Role", fg_color="#5865F2", command=confirm_add).pack(pady=10)
+
     desc_win.bind("<Return>", lambda e: confirm_add())
 
 ctk.CTkButton(f_rr_controls, text="➕ Thêm Role", width=100, command=btn_add_rr_role).pack(side="left")
 
 def btn_spawn_rr():
+
     def _bg_spawn():
+
         active = gui_settings.get("active_profile", "Default")
+
         if not current_server_id:
+
             root.after(0, lambda: messagebox.showwarning("Lỗi", "Vui lòng chọn Server!"))
+
             return
-        c_val = combo_rr_channel.get()
+
+c_val = combo_rr_channel.get()
+
         if c_val == "Không Yêu Cầu":
+
             root.after(0, lambda: messagebox.showerror("Lỗi", "Chưa chọn kênh để gửi Menu!"))
+
             return
-        chan_id = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == c_val), None)
+
+chan_id = next((str(c["id"]) for c in current_server_data.get("channels", []) if c["name"] == c_val), None)
+
         title = entry_rr_title.get().strip() or "Bảng Lựa Chọn Vai Trò"
+
         panel_desc = entry_rr_desc.get().strip()
-        
+
         if not current_rr_roles:
+
             root.after(0, lambda: messagebox.showerror("Lỗi", "Vui lòng thêm ít nhất 1 Role!"))
+
             return
-            
-        payload = json.dumps({"guild_id": current_server_id, "channel_id": chan_id, "title": title, "desc": panel_desc, "roles": current_rr_roles})
-        
+
+payload = json.dumps({"guild_id": current_server_id, "channel_id": chan_id, "title": title, "desc": panel_desc, "roles": current_rr_roles})
+
         try:
+
             resp = _remote_request("SPAWN_RR_PANEL", {"payload": json.loads(payload)})
+
             if resp and resp.get("ok"):
+
                 root.after(0, lambda: messagebox.showinfo("Thành công", "✅ Đã gửi lệnh cho Bot! Menu Role sẽ xuất hiện trên kênh Discord chỉ sau 3 giây."))
-            else:
+
+else:
+
                 err_text = resp.get("error") if (resp and resp.get("error")) else "Chưa bật Bot hoặc không kết nối được tới API Server."
+
                 if not is_bot_running(active):
+
                     root.after(0, lambda: messagebox.showerror("Bot Đang Dừng", "⚠️ Bot hiện chưa được BẬT!\n\nVui lòng nhấn nút ▶ CHẠY BOT ở mục TRẠNG THÁI & ĐIỀU KHIỂN LOCAL trước khi phát bảng Role lên Server Discord."))
-                else:
+
+else:
+
                     root.after(0, lambda: messagebox.showerror("Lỗi API", f"⚠️ Bot không phản hồi lệnh SPAWN_RR_PANEL.\n\nChi tiết: {err_text}"))
-        except Exception as e:
+
+except Exception as e:
+
             root.after(0, lambda: messagebox.showerror("Lỗi API", str(e)))
 
-    threading.Thread(target=_bg_spawn, daemon=True).start()
+threading.Thread(target=_bg_spawn, daemon=True).start()
 
 ctk.CTkButton(f_rr, text="▶ PHÁT BẢNG MÀU LÊN SERVER", fg_color="#23A559", font=("Segoe UI", 12, "bold"), command=btn_spawn_rr).pack(pady=15)
 
 def on_server_select(choice):
-    try:
-        global current_server_id, current_server_data
-        sid = parse_server_id_from_choice(choice)
-        if not sid: return
-        
-        current_server_id = sid
-        current_server_data = srv_data.get(sid, {})
-                
-        c_names = ["Không Yêu Cầu"] + [c["name"] for c in current_server_data.get("channels", [])]
-        r_names = ["Không Yêu Cầu"] + [r["name"] for r in current_server_data.get("roles", [])]
-        cat_names = ["Không Yêu Cầu (Tạo thư mục mặc định)"] + [c["name"] for c in current_server_data.get("categories", [])]
-        
-        combo_welcome_channel.configure(values=c_names)
-        combo_automod_channel.configure(values=c_names)
-        combo_log_channel.configure(values=c_names)
-        combo_rr_channel.configure(values=c_names)
-        combo_boost_channel.configure(values=c_names)
-        combo_auto_role.configure(values=r_names)
-        combo_mod_add.configure(values=r_names)
-        combo_rr_add.configure(values=r_names)
-        combo_booster_role.configure(values=r_names)
-        combo_voice_category.configure(values=cat_names)
-        
-        scf = cfg.get("servers", {}).get(current_server_id, {})
-        
-        entry_welcome.delete(0, tk.END); entry_welcome.insert(0, str(scf.get("welcome_message", cfg.get("welcome_message", "🚀 Welcome {mention}!"))))
-        entry_leave.delete(0, tk.END); entry_leave.insert(0, str(scf.get("leave_message", cfg.get("leave_message", "{name} đã rời đi."))))
-        
-        textbox_banned_words.delete("1.0", tk.END)
-        resp = _remote_request("DB_QUERY", {"query": "SELECT word FROM blacklists WHERE guild_id=?", "params": [str(current_server_id)]})
-        if resp and resp.get("ok"):
-            words = [row.get("word", "") for row in resp.get("data", [])]
-            textbox_banned_words.insert("1.0", "\n".join(words))
-            
-        entry_automod_mute_mins.delete(0, tk.END); entry_automod_mute_mins.insert(0, str(scf.get("automod_mute_minutes", cfg.get("automod_mute_minutes", 5))))
-        entry_bg.delete(0, tk.END); entry_bg.insert(0, str(scf.get("background_image", cfg.get("background_image", ""))))
-        entry_font.delete(0, tk.END); entry_font.insert(0, str(scf.get("font_file", cfg.get("font_file", ""))))
-        entry_x.delete(0, tk.END); entry_x.insert(0, str(scf.get("avatar_x", cfg.get("avatar_x", 300))))
-        entry_y.delete(0, tk.END); entry_y.insert(0, str(scf.get("avatar_y", cfg.get("avatar_y", 50))))
-        entry_size.delete(0, tk.END); entry_size.insert(0, str(scf.get("avatar_size", cfg.get("avatar_size", 200))))
-        
-        cid = str(scf.get("welcome_channel_id", cfg.get("welcome_channel_id", "")))
-        combo_welcome_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == cid), "Không Yêu Cầu"))
-        
-        am_cid = str(scf.get("automod_channel_id", cfg.get("automod_channel_id", "")))
-        combo_automod_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == am_cid), "Không Yêu Cầu"))
-        
-        log_cid = str(scf.get("log_channel_id", cfg.get("log_channel_id", "")))
-        combo_log_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == log_cid), "Không Yêu Cầu"))
-        
-        arid = scf.get("auto_role_id", cfg.get("auto_role_id"))
-        combo_auto_role.set(next((r["name"] for r in current_server_data.get("roles", []) if r["id"] == arid), "Không Yêu Cầu"))
-        
-        vcat_id = str(scf.get("voice_category_id", ""))
-        combo_voice_category.set(next((c["name"] for c in current_server_data.get("categories", []) if str(c["id"]) == vcat_id), "Không Yêu Cầu (Tạo thư mục mặc định)"))
-        
-        global current_mod_roles
-        current_mod_roles = []
-        mr_ids = scf.get("mod_role_ids", [])
-        if not mr_ids and scf.get("mod_role_id"):
-            mr_ids = [scf.get("mod_role_id")]
-        for saved_id in mr_ids:
-            r_name = next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == str(saved_id)), None)
-            if r_name: current_mod_roles.append({"id": str(saved_id), "name": r_name})
-        refresh_mod_roles_ui()
 
-        # Boost settings
+    try:
+
+        global current_server_id, current_server_data
+
+        sid = parse_server_id_from_choice(choice)
+
+        if not sid: return
+
+        current_server_id = sid
+
+        current_server_data = srv_data.get(sid, {})
+
+        c_names = ["Không Yêu Cầu"] + [c["name"] for c in current_server_data.get("channels", [])]
+
+        r_names = ["Không Yêu Cầu"] + [r["name"] for r in current_server_data.get("roles", [])]
+
+        cat_names = ["Không Yêu Cầu (Tạo thư mục mặc định)"] + [c["name"] for c in current_server_data.get("categories", [])]
+
+        combo_welcome_channel.configure(values=c_names)
+
+        combo_automod_channel.configure(values=c_names)
+
+        combo_log_channel.configure(values=c_names)
+
+        combo_rr_channel.configure(values=c_names)
+
+        combo_boost_channel.configure(values=c_names)
+
+        combo_auto_role.configure(values=r_names)
+
+        combo_mod_add.configure(values=r_names)
+
+        combo_rr_add.configure(values=r_names)
+
+        combo_booster_role.configure(values=r_names)
+
+        combo_voice_category.configure(values=cat_names)
+
+        scf = cfg.get("servers", {}).get(current_server_id, {})
+
+        entry_welcome.delete(0, tk.END); entry_welcome.insert(0, str(scf.get("welcome_message", cfg.get("welcome_message", "🚀 Welcome {mention}!"))))
+
+        entry_leave.delete(0, tk.END); entry_leave.insert(0, str(scf.get("leave_message", cfg.get("leave_message", "{name} đã rời đi."))))
+
+        textbox_banned_words.delete("1.0", tk.END)
+
+        resp = _remote_request("DB_QUERY", {"query": "SELECT word FROM blacklists WHERE guild_id=?", "params": [str(current_server_id)]})
+
+        if resp and resp.get("ok"):
+
+            words = [row.get("word", "") for row in resp.get("data", [])]
+
+            textbox_banned_words.insert("1.0", "\n".join(words))
+
+entry_automod_mute_mins.delete(0, tk.END); entry_automod_mute_mins.insert(0, str(scf.get("automod_mute_minutes", cfg.get("automod_mute_minutes", 5))))
+
+        entry_bg.delete(0, tk.END); entry_bg.insert(0, str(scf.get("background_image", cfg.get("background_image", ""))))
+
+        entry_font.delete(0, tk.END); entry_font.insert(0, str(scf.get("font_file", cfg.get("font_file", ""))))
+
+        entry_x.delete(0, tk.END); entry_x.insert(0, str(scf.get("avatar_x", cfg.get("avatar_x", 300))))
+
+        entry_y.delete(0, tk.END); entry_y.insert(0, str(scf.get("avatar_y", cfg.get("avatar_y", 50))))
+
+        entry_size.delete(0, tk.END); entry_size.insert(0, str(scf.get("avatar_size", cfg.get("avatar_size", 200))))
+
+        cid = str(scf.get("welcome_channel_id", cfg.get("welcome_channel_id", "")))
+
+        combo_welcome_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == cid), "Không Yêu Cầu"))
+
+        am_cid = str(scf.get("automod_channel_id", cfg.get("automod_channel_id", "")))
+
+        combo_automod_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == am_cid), "Không Yêu Cầu"))
+
+        log_cid = str(scf.get("log_channel_id", cfg.get("log_channel_id", "")))
+
+        combo_log_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == log_cid), "Không Yêu Cầu"))
+
+        arid = scf.get("auto_role_id", cfg.get("auto_role_id"))
+
+        combo_auto_role.set(next((r["name"] for r in current_server_data.get("roles", []) if r["id"] == arid), "Không Yêu Cầu"))
+
+        vcat_id = str(scf.get("voice_category_id", ""))
+
+        combo_voice_category.set(next((c["name"] for c in current_server_data.get("categories", []) if str(c["id"]) == vcat_id), "Không Yêu Cầu (Tạo thư mục mặc định)"))
+
+        global current_mod_roles
+
+        current_mod_roles = []
+
+        mr_ids = scf.get("mod_role_ids", [])
+
+        if not mr_ids and scf.get("mod_role_id"):
+
+            mr_ids = [scf.get("mod_role_id")]
+
+for saved_id in mr_ids:
+
+            r_name = next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == str(saved_id)), None)
+
+            if r_name: current_mod_roles.append({"id": str(saved_id), "name": r_name})
+
+refresh_mod_roles_ui()
+
         boost_cid = str(scf.get("boost_channel_id", ""))
+
         combo_boost_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == boost_cid), "Không Yêu Cầu"))
+
         booster_rid = str(scf.get("booster_role_id", ""))
+
         combo_booster_role.set(next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == booster_rid), "Không Yêu Cầu"))
+
         entry_boost_msg.delete(0, "end"); entry_boost_msg.insert(0, str(scf.get("boost_message", "")))
 
-
-
         rr_cid = str(scf.get("rr_channel_id", ""))
+
         combo_rr_channel.set(next((c["name"] for c in current_server_data.get("channels", []) if str(c["id"]) == rr_cid), "Không Yêu Cầu"))
+
         entry_rr_title.delete(0, 'end'); entry_rr_title.insert(0, str(scf.get("rr_title", "")))
+
         global current_rr_roles
+
         current_rr_roles = []
+
         saved_rrs = scf.get("rr_roles_list", [])
+
         for saved_id in saved_rrs:
+
             r_name = next((r["name"] for r in current_server_data.get("roles", []) if str(r["id"]) == saved_id), None)
+
             if r_name: current_rr_roles.append({"id": saved_id, "name": r_name})
-        refresh_rr_roles_ui()
 
+refresh_rr_roles_ui()
 
-    except Exception as e:
+except Exception as e:
+
         import traceback
+
         traceback.print_exc()
+
         messagebox.showerror("Lỗi khi chọn Server", str(e))
 
 combo_servers.configure(command=on_server_select)
 
-# Status + buttons now embedded inside LOCAL section (fc_local_ctrl above)
-# Keep a no-op reference so update_status_label() still works via globals()
-
 def on_closing():
+
     for active in list(gui_settings["profiles"].keys()):
+
         proc = bot_processes.get(active)
+
         if proc:
+
             try:
+
                 for child in proc.children(recursive=True): child.kill()
+
                 proc.kill()
-            except: pass
-            
-        profile = gui_settings["profiles"].get(active)
+
+except: pass
+
+profile = gui_settings["profiles"].get(active)
+
         if profile:
+
             config_file = profile.get("config_file", "config.json")
+
             current_dir = os.path.abspath(os.path.dirname(__file__))
+
             for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+
                 try:
+
                     cmd = proc_info.info.get('cmdline') or []
+
                     cmd_str = " ".join(cmd)
+
                     if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+
                         if f"--config={config_file}" in cmd_str or (config_file == "config.json" and "--config=" not in cmd_str):
+
                             if any(current_dir in arg for arg in cmd):
+
                                 spider = psutil.Process(proc_info.info['pid'])
+
                                 for child in spider.children(recursive=True): child.kill()
+
                                 spider.kill()
-                except: pass
-    root.destroy()
+
+except: pass
+
+root.destroy()
+
     os._exit(0)
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
-# TAB SOCIAL MEDIA
 def get_db_path():
+
     db_name = cfg.get("database_name", "bot_core")
+
     return os.path.join("databases", f"{db_name}.db")
 
 def get_social_db():
+
     db_path = get_db_path()
+
     if not os.path.exists(db_path): return []
+
     resp = _remote_request("DB_QUERY", {"query": "SELECT guild_id, platform, target_id, channel_id, ping_role FROM social_tracker"})
+
     if resp and resp.get("ok"):
+
         return [[r["guild_id"], r["platform"], r["target_id"], r["channel_id"], r["ping_role"]] for r in resp.get("data", [])]
-    return []
+
+return []
 
 def refresh_social_list():
+
     for w in social_list_frame.winfo_children(): w.destroy()
+
     rows = get_social_db()
+
     if not rows:
+
         ctk.CTkLabel(social_list_frame, text="Chưa có Ăng-ten nào. Thêm mới bên trên!",
+
                      text_color="#888", font=("Segoe UI", 12)).pack(pady=20)
+
         return
 
-    PLATFORM_COLORS = {"youtube": "#FF0000", "reddit": "#FF4500", "tiktok": "#010101", "facebook": "#1877F2"}
+PLATFORM_COLORS = {"youtube": "#FF0000", "reddit": "#FF4500", "tiktok": "#010101", "facebook": "#1877F2"}
+
     PLATFORM_ICONS  = {"youtube": "▶️", "reddit": "🟧", "tiktok": "🎵", "facebook": "🔵"}
+
     for row in rows:
+
         guild_id, plat, target_id, channel_id, ping_role = row
+
         color = PLATFORM_COLORS.get(plat, "#5865F2")
+
         icon  = PLATFORM_ICONS.get(plat, "🔗")
 
         row_frame = ctk.CTkFrame(social_list_frame, fg_color="#2B2D31", corner_radius=10)
+
         row_frame.pack(fill="x", padx=5, pady=4)
 
         left = ctk.CTkFrame(row_frame, fg_color="transparent")
+
         left.pack(side="left", fill="both", expand=True, padx=10, pady=8)
 
         header = ctk.CTkLabel(left,
+
             text=f"{icon} {plat.upper()}",
+
             font=("Segoe UI", 13, "bold"), text_color=color)
+
         header.pack(anchor="w")
 
         ctk.CTkLabel(left, text=f"Target: {target_id[:60]}",
+
                      font=("Segoe UI", 11), text_color="#ccc").pack(anchor="w")
+
         ctk.CTkLabel(left, text=f"Channel ID: {channel_id}  |  Ping: {ping_role or 'None'}",
+
                      font=("Segoe UI", 10), text_color="#888").pack(anchor="w")
 
         def make_delete(g=guild_id, p=plat, t=target_id):
-            def _del():
-                try:
-                    _remote_request("DB_QUERY", {"query": "DELETE FROM social_tracker WHERE guild_id=? AND platform=? AND target_id=?", "params": [g, p, t]})
-                    refresh_social_list()
-                except Exception as e:
-                    messagebox.showerror("Lỗi", str(e))
-            return _del
 
-        ctk.CTkButton(row_frame, text="❌ Xóa", width=70, height=30,
+            def _del():
+
+                try:
+
+                    _remote_request("DB_QUERY", {"query": "DELETE FROM social_tracker WHERE guild_id=? AND platform=? AND target_id=?", "params": [g, p, t]})
+
+                    refresh_social_list()
+
+except Exception as e:
+
+                    messagebox.showerror("Lỗi", str(e))
+
+return _del
+
+ctk.CTkButton(row_frame, text="❌ Xóa", width=70, height=30,
+
                       fg_color="#DA373C", hover_color="#A12828",
+
                       command=make_delete()).pack(side="right", padx=10)
 
-# Header card
 fsc_header = ctk.CTkFrame(sf_social, fg_color="#5865F2", corner_radius=12)
+
 fsc_header.pack(pady=10, fill="x", padx=5)
+
 ctk.CTkLabel(fsc_header, text="📡 TRUNG TÂM QUẢN LÝ RADAR MẠNG XÃ HỘI",
+
              font=("Segoe UI", 15, "bold"), text_color="white").pack(pady=(12,4))
+
 ctk.CTkLabel(fsc_header, text="Tự động cào tin tức từ YouTube / Reddit / TikTok / Facebook và thông báo vào kênh Discord!\n(Lưu ý: Bot phải đang chạy thì mậy mới lấy được danh sách Channel thực tế.)",
+
              font=("Segoe UI", 11), text_color="#ddd", justify="center").pack(pady=(0,12))
 
-# Add form card
 fsc_add = ctk.CTkFrame(sf_social, fg_color="#2B2D31", corner_radius=12)
+
 fsc_add.pack(pady=5, fill="x", padx=5)
+
 ctk.CTkLabel(fsc_add, text="➕ ĂNG-TEN SÓNG MỚI",
+
              font=("Segoe UI", 13, "bold"), text_color="#23A559").pack(pady=(12,5))
 
 social_add_body = ctk.CTkFrame(fsc_add, fg_color="transparent")
+
 social_add_body.pack(fill="x", padx=15, pady=5)
 
-# Row 1: Platform + Server selector
 row1 = ctk.CTkFrame(social_add_body, fg_color="transparent")
+
 row1.pack(fill="x", pady=(0,8))
 
 ctk.CTkLabel(row1, text="Nền Tảng:", font=("Segoe UI", 12, "bold"), width=110, anchor="w").pack(side="left")
+
 combo_social_platform = ctk.CTkComboBox(row1, values=["youtube","reddit","tiktok","facebook"],
+
                                          width=140, height=32, font=("Segoe UI", 12))
+
 combo_social_platform.set("youtube")
+
 combo_social_platform.pack(side="left", padx=(0,15))
 
 ctk.CTkLabel(row1, text="Server:", font=("Segoe UI", 12, "bold"), width=60, anchor="w").pack(side="left")
+
 combo_social_server = ctk.CTkComboBox(row1,
+
     values=[get_server_display_name(k, v) for k, v in srv_data.items()],
+
     width=200, height=32, font=("Segoe UI", 11))
+
 combo_social_server.pack(side="left")
 
-# Row 2: Target URL/ID
 row2 = ctk.CTkFrame(social_add_body, fg_color="transparent")
+
 row2.pack(fill="x", pady=(0,8))
+
 ctk.CTkLabel(row2, text="Link / ID / Tên:", font=("Segoe UI", 12, "bold"), width=110, anchor="w").pack(side="left")
+
 entry_social_target = ctk.CTkEntry(row2, placeholder_text="VD: UCxxxx (YouTube) | programming (Reddit) | @mrwhosetheboss (TikTok) | https://rss.app/... (FB)",
+
                                     width=410, height=32, font=("Segoe UI", 11))
+
 entry_social_target.pack(side="left")
 
-# Row 3: Channel ID + optional ping
 row3 = ctk.CTkFrame(social_add_body, fg_color="transparent")
+
 row3.pack(fill="x", pady=(0,8))
+
 ctk.CTkLabel(row3, text="Channel ID:", font=("Segoe UI", 12, "bold"), width=110, anchor="w").pack(side="left")
+
 combo_social_channel = ctk.CTkComboBox(row3, values=["(Chọn server trước)"],
+
                                          width=220, height=32, font=("Segoe UI", 11))
+
 combo_social_channel.pack(side="left", padx=(0,15))
 
 ctk.CTkLabel(row3, text="Ping:", font=("Segoe UI", 12, "bold"), width=40, anchor="w").pack(side="left")
+
 entry_social_ping = ctk.CTkEntry(row3, placeholder_text="@everyone hoặc để trống",
+
                                   width=140, height=32, font=("Segoe UI", 11))
+
 entry_social_ping.pack(side="left")
 
 def on_social_server_select(choice):
+
     """Load channels for selected server into the channel combobox."""
+
     try:
+
         sid = parse_server_id_from_choice(choice)
+
         if sid and sid in srv_data:
+
             sdata = srv_data[sid]
+
             channels = [(c["name"], str(c["id"])) for c in sdata.get("channels", [])]
+
             combo_social_channel.configure(values=[f"{n} ({i})" for n, i in channels])
+
             if channels:
+
                 combo_social_channel.set(f"{channels[0][0]} ({channels[0][1]})")
-    except: pass
+
+except: pass
 
 combo_social_server.configure(command=on_social_server_select)
+
 combo_social_server.configure(values=[get_server_display_name(k, v) for k, v in srv_data.items()])
 
 def btn_add_social_click():
+
     platform = combo_social_platform.get().lower().strip()
+
     target   = entry_social_target.get().strip()
+
     ping     = entry_social_ping.get().strip()
+
     chan_val  = combo_social_channel.get()
 
     if not platform or not target:
+
         return messagebox.showwarning("⚠️ Thiếu dữ liệu", "Vui lòng chọn Nền Tảng và nhập Link/ID.")
-    if "(" not in chan_val:
+
+if "(" not in chan_val:
+
         return messagebox.showwarning("⚠️ Thiếu kênh", "Vui lòng chọn Server và Kênh nhận thông báo.")
 
-    # Extract channel ID from "channel-name (123456789)"
-    channel_id = chan_val.rsplit("(", 1)[-1].rstrip(")")
+channel_id = chan_val.rsplit("(", 1)[-1].rstrip(")")
 
-    # Find guild_id for the selected server
     sv_choice = combo_social_server.get()
+
     guild_id = parse_server_id_from_choice(sv_choice) or ""
+
     if not guild_id:
+
         return messagebox.showwarning("⚠️ Thiếu Server", "Không tìm thấy Server ID. Vui lòng chọn lại.")
 
-    # Normalise target_id
-    target_id = target
-    if platform == "youtube":
-        m = __import__("re").search(r'channel/(UC[\w-]+)', target)
-        if m: target_id = m.group(1)
-    elif platform == "reddit" and "reddit.com/r/" in target:
-        target_id = target.split("reddit.com/r/")[1].split("/")[0]
-    elif platform == "tiktok":
-        target_id = target.lstrip("@").split("/")[-1].split("?")[0]
-    # facebook: keep as-is (RSS url)
+target_id = target
 
-    try:
+    if platform == "youtube":
+
+        m = __import__("re").search(r'channel/(UC[\w-]+)', target)
+
+        if m: target_id = m.group(1)
+
+elif platform == "reddit" and "reddit.com/r/" in target:
+
+        target_id = target.split("reddit.com/r/")[1].split("/")[0]
+
+elif platform == "tiktok":
+
+        target_id = target.lstrip("@").split("/")[-1].split("?")[0]
+
+try:
+
         _remote_request("DB_QUERY", {
+
             "query": "INSERT OR REPLACE INTO social_tracker (guild_id, platform, target_id, channel_id, ping_role, last_post_id) VALUES (?, ?, ?, ?, ?, ?)",
+
             "params": [guild_id, platform, target_id, channel_id, ping, "NO_POST_YET"]
+
         })
+
         entry_social_target.delete(0, tk.END)
+
         entry_social_ping.delete(0, tk.END)
+
         refresh_social_list()
+
         messagebox.showinfo("✅ Thành công!",
+
             f"Đã cắm Ăng-ten {platform.upper()} cho {target_id}\nBot sẽ bưng bài vào channel thông báo sau ≤ 5 phút.")
-    except Exception as e:
+
+except Exception as e:
+
         messagebox.showerror("❌ Lỗi DB", str(e))
 
 ctk.CTkButton(fsc_add, text="➕ Cắm Ăng-ten Sóng", height=36, width=200,
+
               font=("Segoe UI", 13, "bold"),
+
               fg_color="#23A559", hover_color="#1A7A41",
+
               command=btn_add_social_click).pack(pady=(5,14))
 
-# Help card
 fsc_help = ctk.CTkFrame(sf_social, fg_color="#1e3a2f", corner_radius=10)
+
 fsc_help.pack(pady=5, fill="x", padx=5)
+
 help_text = ("""ℹ️ HƯỠNG DỬAẠ__SỨ DỤNG__
 
 ▶ YouTube — Dán Channel URL hoặc chỉ nhập Channel ID (bắt đầu bằng UC...)
@@ -1516,91 +2444,139 @@ help_text = ("""ℹ️ HƯỠNG DỬAẠ__SỨ DỤNG__
 🔵 Facebook — Dán URL RSS được tạo từ rss.app hoặc rssbridge.org
 
 Ping — Nhập @everyone, @here hoặc để trống nếu không muốn ping ai.""")
+
 ctk.CTkLabel(fsc_help, text=help_text, font=("Segoe UI", 11),
+
              text_color="#a8f0c6", justify="left").pack(padx=15, pady=10, anchor="w")
 
-# List card
 fsc_list_header = ctk.CTkFrame(sf_social, fg_color="#2B2D31", corner_radius=12)
+
 fsc_list_header.pack(pady=(10,0), fill="x", padx=5)
+
 ctk.CTkLabel(fsc_list_header, text="📡 DANH SÁCH ĂNG-TEN ĐANG BẮT SÓNG",
+
              font=("Segoe UI", 13, "bold"), text_color="#00b4d8").pack(side="left", padx=15, pady=8)
+
 ctk.CTkButton(fsc_list_header, text="🔄 Làm Mới", width=90, height=30,
+
               fg_color="#4752C4", hover_color="#3641a0",
+
               command=refresh_social_list).pack(side="right", padx=10)
 
 social_list_frame = ctk.CTkScrollableFrame(sf_social, fg_color="transparent", height=280)
+
 social_list_frame.pack(fill="x", padx=5, pady=(0,10))
 
 refresh_social_list()
 
-
-
-
 last_bot_status = False
 
 def check_status_loop():
+
     global last_bot_status
+
     try:
+
         active = gui_settings.get("active_profile", "Default")
+
         is_running = is_bot_running(active)
+
         update_status_label()
-        
-        # Nếu bot vừa chuyển từ OFF -> ON hoặc srv_data rỗng/chỉ chứa offline server nhưng bot đang chạy
+
         has_only_offline = not srv_data or all("(Offline)" in v.get("name", "") or "Offline/Chưa kết nối" in v.get("name", "") for v in srv_data.values())
+
         if is_running and (not last_bot_status or has_only_offline):
+
             new_srv_data = get_server_data()
-            # Kiểm tra xem new_srv_data có thực sự chứa dữ liệu thật (không phải offline fallback)
+
             has_real_data = new_srv_data and not all("(Offline)" in v.get("name", "") or "Offline/Chưa kết nối" in v.get("name", "") for v in new_srv_data.values())
+
             if has_real_data:
+
                 update_server_comboboxes()
-                
-        last_bot_status = is_running
-    except Exception as e:
+
+last_bot_status = is_running
+
+except Exception as e:
+
         print(f"Lỗi loop trạng thái: {e}")
-    root.after(2000, check_status_loop)
+
+root.after(2000, check_status_loop)
 
 def stop_all_processes():
-    """Tắt toàn bộ tiến trình Bot (main.py) liên quan khi đóng GUI."""
-    current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
-    for name, proc in list(bot_processes.items()):
-        if proc:
-            try:
-                for child in proc.children(recursive=True):
-                    child.kill()
-                proc.kill()
-            except Exception:
-                pass
-            bot_processes[name] = None
 
-    for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+    """Tắt toàn bộ tiến trình Bot (main.py) liên quan khi đóng GUI."""
+
+    current_dir = os.path.normpath(os.path.abspath(os.path.dirname(__file__))).lower()
+
+    for name, proc in list(bot_processes.items()):
+
+        if proc:
+
+            try:
+
+                for child in proc.children(recursive=True):
+
+                    child.kill()
+
+proc.kill()
+
+except Exception:
+
+                pass
+
+bot_processes[name] = None
+
+for proc_info in psutil.process_iter(['pid', 'name', 'cmdline']):
+
         try:
+
             cmd = proc_info.info.get('cmdline') or []
+
             cmd_str = " ".join(cmd).lower()
+
             if proc_info.info.get('name', '').lower().startswith('python') and 'main.py' in cmd_str:
+
                 if any(current_dir in os.path.normpath(arg).lower() for arg in cmd):
+
                     spider = psutil.Process(proc_info.info['pid'])
+
                     for child in spider.children(recursive=True):
+
                         child.kill()
-                    spider.kill()
-        except Exception:
+
+spider.kill()
+
+except Exception:
+
             pass
 
 def on_closing():
+
     try:
+
         stop_all_processes()
-    except Exception as e:
+
+except Exception as e:
+
         print(f"[GUI Shutdown Error] {e}")
-    finally:
+
+finally:
+
         try:
+
             root.destroy()
-        except Exception:
+
+except Exception:
+
             pass
-        sys.exit(0)
+
+sys.exit(0)
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
-# Load GUI fields with the active profile config
 reload_gui_inputs()
+
 check_status_loop()
 
 root.mainloop()
